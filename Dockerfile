@@ -8,5 +8,6 @@ COPY --from=terraform /bin/terraform /usr/local/bin/terraform
 COPY validation/*.py /app/
 COPY execution/*.py execution/bindings.schema.json /runtime/
 COPY prompt-tests/*.py /prompt-tests/
+COPY legacy-jira/*.py /legacy-jira/
 USER 10001:10001
 ENTRYPOINT ["python", "/app/worker.py"]

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_image=${PASCODE_IMAGE:?Set PASCODE_IMAGE to the pinned engine image}
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'PASCODE_IMAGE must be immutable' >&2; exit 2; }
+task_command=${1:-}
+task_input=${2:-}
+task_output=${3:-}
+case "$task_command" in build_analysis|build_mapped|extended_checks|validate_ontology_mapping|generate_test_suite_from_yaml|run_generated_static_tests) ;; *) echo 'Select an existing Jira analysis command' >&2; exit 2 ;; esac
+[[ -d "$task_input/jira-as-code" && -n "$task_output" ]] || { echo 'Usage: jira-analysis COMMAND PASCODE_ROOT OUTPUT_ROOT [SCRIPT_ARGUMENTS...]' >&2; exit 2; }
+shift 3
+if [[ "$task_command" == generate_test_suite_from_yaml && $# == 0 ]]; then
+  set -- --input-dir /inputs/jira-as-code --output-dir /outputs/analysis/prompts/generated
+fi
+task_input=$(realpath -- "$task_input")
+mkdir -p -- "$task_output/analysis" "$task_output/mapped"
+task_output=$(realpath -- "$task_output")
+task_context=()
+if [[ -f "$task_input/jira-as-code/analysis/legacy-context.json" ]]; then
+  task_context=(-e PASCODE_LEGACY_CONTEXT=/inputs/jira-as-code/analysis/legacy-context.json)
+fi
+exec docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
+  -e PASCODE_JIRA_ROOT=/inputs/jira-as-code -e PASCODE_MAPPED_OUTPUT=/outputs/mapped \
+  -e PASCODE_ANALYSIS_OUTPUT=/outputs/analysis "${task_context[@]}" \
+  -v "$task_input:/inputs:ro" -v "$task_output:/outputs:rw" \
+  -w /outputs --entrypoint python "$task_image" "/legacy-jira/$task_command.py" "$@"

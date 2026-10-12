@@ -1,0 +1,93 @@
+{
+  "implementations": [
+    {
+      "instance": "cdt",
+      "path": "/home/alan/src/cloisterdorateura/pascode/jira-as-code/analysis/scripts/build_analysis.py",
+      "sha256_before": "a43bf9b17b9996f39cd592053e9c82b90487e066b41e713c6f780569c237f3d2",
+      "implementation": "legacy-jira/build_analysis.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "cdt",
+      "path": "/home/alan/src/cloisterdorateura/pascode/jira-as-code/analysis/scripts/build_mapped.py",
+      "sha256_before": "cb10a82fbe31d24f24ba55e1cbdf28e27b65fc7a3daad47c745ab080f95a1b8e",
+      "implementation": "legacy-jira/build_mapped.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "cdt",
+      "path": "/home/alan/src/cloisterdorateura/pascode/jira-as-code/analysis/scripts/extended_checks.py",
+      "sha256_before": "48fc162ef766d031a564e47029a94ebdb7d6a5549ca4f93a3e2740767ef64787",
+      "implementation": "legacy-jira/extended_checks.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "cdt",
+      "path": "/home/alan/src/cloisterdorateura/pascode/jira-as-code/analysis/scripts/generate_test_suite_from_yaml.py",
+      "sha256_before": "3e994b1c41cd637e19f3fd118b70302828cda3e732157098d06d68bd3a7a01af",
+      "implementation": "legacy-jira/generate_test_suite_from_yaml.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "cdt",
+      "path": "/home/alan/src/cloisterdorateura/pascode/jira-as-code/analysis/scripts/run_generated_static_tests.py",
+      "sha256_before": "87da06bd1c1b824be10402cca8e9e7bd23a521f4ebdc64b45126c61a78f0322f",
+      "implementation": "legacy-jira/run_generated_static_tests.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/build_analysis.py",
+      "sha256_before": "fe344b233d353196b650566aabfe1cda170f850644ae46932b7bdd7e7849d9eb",
+      "implementation": "legacy-jira/build_analysis.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/build_mapped.py",
+      "sha256_before": "0b00d769b97b0aedb0ca844987eb7b0386557b2dd44b0e5705745bf5cdb988a7",
+      "implementation": "legacy-jira/build_mapped.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/extended_checks.py",
+      "sha256_before": "a4b26002369776b339fcddca79ab8febb65dd3e3857d21df8825e40082f941e5",
+      "implementation": "legacy-jira/extended_checks.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/generate_test_suite_from_yaml.py",
+      "sha256_before": "3e994b1c41cd637e19f3fd118b70302828cda3e732157098d06d68bd3a7a01af",
+      "implementation": "legacy-jira/generate_test_suite_from_yaml.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/run_generated_static_tests.py",
+      "sha256_before": "87da06bd1c1b824be10402cca8e9e7bd23a521f4ebdc64b45126c61a78f0322f",
+      "implementation": "legacy-jira/run_generated_static_tests.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    },
+    {
+      "instance": "brb",
+      "path": "/home/alan/src/blueridgebots/pascode/jira-as-code/analysis/scripts/validate_ontology_mapping.py",
+      "sha256_before": "13f447bc053d2bdc242018cdd61897b7535f8d130e952d53da4b23bd392a189b",
+      "implementation": "legacy-jira/validate_ontology_mapping.py",
+      "disposition": "shared-software-with-instance-compatibility-wrapper"
+    }
+  ],
+  "duplicates_before": [
+    "generate_test_suite_from_yaml.py",
+    "run_generated_static_tests.py"
+  ],
+  "variants_unified": [
+    "build_mapped.py",
+    "build_analysis.py",
+    "extended_checks.py"
+  ],
+  "instance_data": "sites, account labels, optional dialect sections and historical samples remain in legacy-context.json",
+  "remaining_duplicate_mapping_implementations_in_audited_paths": [],
+  "limits": "Existing static YAML-dialect tooling retained; no new execution adapter, daemon or .pascode layout."
+}

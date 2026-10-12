@@ -8,3 +8,5 @@
 !execution/bindings.schema.json
 !prompt-tests/
 !prompt-tests/*.py
+!legacy-jira/
+!legacy-jira/*.py

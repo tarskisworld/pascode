@@ -30,3 +30,9 @@ an explicit declaration fixture mounted read-only at `/inputs`. They make no liv
 Jira calls. `worker.py` CLI uses `--root` and `--schema-root`; `runner.py` implements
 offline validate/map. Persistent state and historical instance evidence remain
 with their owning environment/declaration repositories.
+
+`legacy-jira/` centralizes six existing YAML-dialect mapping/analysis/generation
+implementations previously copied across CDT and BRB. Instance scripts are now
+compatibility wrappers; site/account labels and historical samples remain instance
+inputs. See `legacy-jira/README.md` and its extraction audit. `bin/jira-analysis`
+runs those commands in the pinned offline image with explicit input/output mounts.
