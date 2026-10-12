@@ -1,0 +1,32 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "type":"object","additionalProperties":false,
+  "$defs":{
+    "text":{"type":"string","minLength":1},
+    "named":{"type":"object","properties":{"name":{"$ref":"#/$defs/text"},"id":{"$ref":"#/$defs/text"},"description":{"type":"string"},"default_work_type":{"$ref":"#/$defs/text"}},"additionalProperties":false},
+    "workflow":{"type":"object","properties":{"name":{"$ref":"#/$defs/text"},"description":{"type":"string"},"existing":{"type":"object","required":["id","version","transition_ids"],"properties":{"id":{"$ref":"#/$defs/text"},"version":{"type":"object","required":["id","versionNumber"],"properties":{"id":{"$ref":"#/$defs/text"},"versionNumber":{"type":"integer","minimum":0}},"additionalProperties":false},"transition_ids":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}}},"additionalProperties":false}},"additionalProperties":false}
+  },
+  "properties":{
+    "workflows":{"type":"object","additionalProperties":{"$ref":"#/$defs/workflow"}},
+    "statuses":{"type":"object","additionalProperties":{"type":"object","required":["id","category"],"properties":{"id":{"$ref":"#/$defs/text"},"category":{"enum":["TODO","IN_PROGRESS","DONE"]}},"additionalProperties":false}},
+    "resolutions":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}},
+    "issue_types":{"type":"object","additionalProperties":{"type":"object","required":["id","is_subtask"],"properties":{"id":{"$ref":"#/$defs/text"},"is_subtask":{"type":"boolean"}},"additionalProperties":false}},
+    "work_type_schemes":{"type":"object","additionalProperties":{"$ref":"#/$defs/named"}},
+    "workflow_schemes":{"type":"object","additionalProperties":{"$ref":"#/$defs/named"}},
+    "projects":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}},
+    "permission_schemes":{"type":"object","additionalProperties":{"$ref":"#/$defs/named"}},
+    "project_roles":{"type":"object","additionalProperties":{"$ref":"#/$defs/named"}},
+    "deployment":{
+      "type":"object","additionalProperties":false,
+      "properties":{
+        "defer_permission_assignment":{"type":"boolean","default":false},
+        "project_keys":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/text"}},
+        "project_lead_account_ids":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}},
+        "permission_scheme_ids":{"type":"object","additionalProperties":{"type":"integer","minimum":0}},
+        "project_template_keys":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}},
+        "work_type_names":{"type":"object","additionalProperties":{"$ref":"#/$defs/text"}},
+        "work_type_metadata":{"type":"object","additionalProperties":{"type":"object","additionalProperties":false,"required":["description","is_subtask"],"properties":{"description":{"type":"string"},"is_subtask":{"type":"boolean"}}}}
+      }
+    }
+  }
+}

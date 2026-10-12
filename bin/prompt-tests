@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_image=${PASCODE_IMAGE:?Set PASCODE_IMAGE to a pinned engine image ID or digest}
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'PASCODE_IMAGE must be immutable' >&2; exit 2; }
+task_input=''
+task_output=''
+while (($#)); do
+  case "$1" in
+    --input-dir) task_input=${2:?Missing input path}; shift 2 ;;
+    --output-dir) task_output=${2:?Missing output path}; shift 2 ;;
+    *) echo 'Usage: prompt-tests --input-dir YAML_DIRECTORY --output-dir NEW_DIRECTORY' >&2; exit 2 ;;
+  esac
+done
+[[ -d "$task_input" && -n "$task_output" && ! -e "$task_output" && ! -L "$task_output" ]] || { echo 'Input must exist; output must be new' >&2; exit 2; }
+task_input=$(realpath -- "$task_input")
+task_output=$(realpath -m -- "$task_output")
+[[ "$task_output" != "$task_input" && "$task_output" != "$task_input/"* ]] || { echo 'Output must be outside input' >&2; exit 2; }
+mkdir -p -- "$(dirname -- "$task_output")"
+exec docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
+  -v "$task_input:/inputs:ro" -v "$(dirname -- "$task_output"):/output:rw" \
+  --entrypoint python "$task_image" /prompt-tests/generate.py \
+  --input-dir /inputs --output-dir "/output/$(basename -- "$task_output")"

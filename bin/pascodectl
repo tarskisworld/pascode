@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_image=${PASCODE_IMAGE:?Set PASCODE_IMAGE to a pinned engine image ID or digest}
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'PASCODE_IMAGE must be immutable' >&2; exit 2; }
+task_command=${1:-}
+task_input=${2:-}
+case "$task_command" in validate|map|bindings|plan|apply|verify) ;; *) echo 'Usage: pascodectl {validate|map|bindings|plan|apply|verify} PASCODE_ROOT [OUTPUT_DIRECTORY] [BINDINGS_JSON]' >&2; exit 2 ;; esac
+[[ -d "$task_input/jira-as-code" ]] || { echo 'PASCODE_ROOT must contain jira-as-code' >&2; exit 2; }
+task_input=$(realpath -- "$task_input")
+if [[ "$task_command" == bindings ]]; then
+  [[ -n ${3:-} && $# == 3 ]] || { echo 'Usage: pascodectl bindings PASCODE_ROOT OUTPUT_DIRECTORY' >&2; exit 2; }
+  mkdir -p -- "$3"
+  task_output=$(realpath -- "$3")
+  exec docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user "$(id -u):$(id -g)" \
+    --env PYTHONDONTWRITEBYTECODE=1 --env PYTHONPATH=/runtime:/app \
+    -v "$task_input:/inputs:ro" -v "$task_output:/output" \
+    --entrypoint python "$task_image" \
+    /runtime/bindings.py --root /inputs --output /output/bindings.json
+fi
+if [[ "$task_command" == plan || "$task_command" == apply || "$task_command" == verify ]]; then
+  umask 077
+  [[ -n ${3:-} && -f ${4:-} && $# == 4 ]] || { echo 'Usage: pascodectl {plan|apply|verify} PASCODE_ROOT PRIVATE_WORK_DIRECTORY BINDINGS_JSON' >&2; exit 2; }
+  task_bindings=$(realpath -- "$4")
+  mkdir -p -- "$3"
+  task_work=$(realpath -- "$3")
+  if git -C "$task_work" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo 'Deployment work/state directory must be outside Git repositories' >&2; exit 2
+  fi
+  if [[ ! -f "$task_work/.pascodectl-workspace" ]]; then
+    [[ -z $(ls -A -- "$task_work") ]] || { echo 'Use an empty dedicated deployment directory' >&2; exit 2; }
+    touch "$task_work/.pascodectl-workspace"
+  fi
+  chmod 700 "$task_work"
+  exec 9>"$task_work/.pipeline.lock"
+  flock -n 9 || { echo 'Another pipeline is using this deployment directory' >&2; exit 2; }
+  case ${PASCODE_AUTH_MODE:-} in api_token_bootstrap|api_service_account_override) ;; *) echo 'Select PASCODE_AUTH_MODE explicitly' >&2; exit 2 ;; esac
+  [[ -n ${JIRA_API_EMAIL:-} && -n ${JIRA_API_BASE_URL:-} ]] || { echo 'JIRA_API_EMAIL and JIRA_API_BASE_URL are required' >&2; exit 2; }
+  set +x
+  if [[ -n ${PASCODE_JIRA_TOKEN_SECRET_REF:-} ]]; then
+    JIRA_API_TOKEN=$(gopass show -o "$PASCODE_JIRA_TOKEN_SECRET_REF")
+    JIRA_API_TOKEN=${JIRA_API_TOKEN//$'\r'/}
+    JIRA_API_TOKEN=${JIRA_API_TOKEN//$'\n'/}
+  fi
+  [[ -n ${JIRA_API_TOKEN:-} ]] || { echo 'Provide a runtime token or PASCODE_JIRA_TOKEN_SECRET_REF' >&2; exit 2; }
+  export JIRA_API_TOKEN
+  task_terraform=${PASCODE_TERRAFORM_BINARY:-}
+  if [[ "$task_command" != verify && -n "$task_terraform" ]]; then
+    [[ -n "$task_terraform" && -x "$task_terraform" ]] || { echo 'An existing Terraform >=1.5,<2 binary is required' >&2; exit 2; }
+  fi
+  task_worker() {
+    docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --user "$(id -u):$(id -g)" \
+      --env PYTHONDONTWRITEBYTECODE=1 -e PASCODE_AUTH_MODE -e JIRA_API_EMAIL -e JIRA_API_TOKEN -e JIRA_API_BASE_URL \
+      -v "$task_input:/inputs:ro" \
+      -v "$task_bindings:/bindings/input.json:ro" -v "$task_work:/work" \
+      --entrypoint python "$task_image" \
+      /runtime/deployment.py "$1" --root /inputs --workdir /work --bindings /bindings/input.json
+  }
+  if [[ "$task_command" == verify ]]; then
+    task_worker verify
+    exit 0
+  elif [[ "$task_command" == apply ]]; then
+    task_worker prepare-apply
+  else
+    task_worker prepare
+  fi
+  unset TF_LOG TF_LOG_PATH TF_LOG_PROVIDER TF_LOG_CORE TF_CLI_ARGS TF_CLI_ARGS_init TF_CLI_ARGS_plan TF_CLI_ARGS_apply TF_DATA_DIR TF_WORKSPACE
+  export TF_IN_AUTOMATION=1 TF_INPUT=0
+  export TF_VAR_jira_api_base_url="$JIRA_API_BASE_URL" TF_VAR_jira_admin_email="$JIRA_API_EMAIL" TF_VAR_jira_admin_token="$JIRA_API_TOKEN"
+  task_tf() {
+    if [[ -n "$task_terraform" ]]; then
+      "$task_terraform" -chdir="$task_work/terraform" "$@"
+    else
+      docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+        --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,nosuid,nodev \
+        -e HOME=/tmp -e TF_IN_AUTOMATION -e TF_INPUT \
+        -e TF_VAR_jira_api_base_url -e TF_VAR_jira_admin_email -e TF_VAR_jira_admin_token \
+        -v "$task_work/terraform:/work" -w /work --entrypoint terraform "$task_image" "$@"
+    fi
+  }
+  task_tf init -input=false
+  if [[ "$task_command" == plan ]]; then
+    task_tf plan -input=false
+  else
+    task_tf apply -input=false -auto-approve
+    task_worker rest
+  fi
+  exit 0
+fi
+task_args=()
+task_mounts=()
+if [[ -n ${3:-} ]]; then
+  [[ "$task_command" == map ]] || { echo 'Output directory is only supported for map' >&2; exit 2; }
+  mkdir -p -- "$3"
+  task_output=$(realpath -- "$3")
+  task_mounts=(-v "$task_output:/output")
+  task_args=(--output /output)
+fi
+if [[ -n ${4:-} ]]; then
+  [[ "$task_command" == map && -f "$4" ]] || { echo 'Bindings require map, an output directory and an existing JSON file' >&2; exit 2; }
+  task_bindings=$(realpath -- "$4")
+  task_mounts+=(-v "$task_bindings:/bindings/input.json:ro")
+  task_args+=(--bindings /bindings/input.json)
+fi
+exec docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user "$(id -u):$(id -g)" \
+  -v "$task_input:/inputs:ro" "${task_mounts[@]}" \
+  --entrypoint python "$task_image" /runtime/runner.py "$task_command" --root /inputs "${task_args[@]}"

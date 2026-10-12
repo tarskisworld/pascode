@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-12",
+  "source_git_heads": {
+    "ControlPlane": "a20a61129c41ea194bb7177a41720f460cbd75bb",
+    "cloisterdorateura/pascode": "8df146f87bac5ac66be1396e1178fbd9b55aac8a"
+  },
+  "note": "Extraction preserves local source including preexisting uncommitted work; no deployment credentials/state included.",
+  "files": [
+    {
+      "path": "validation/mcp_server.py",
+      "extracted_from": "ControlPlane/services/validation/mcp_server.py",
+      "sha256": "bdf30e1f2cd8a53f496fb9e5de6e76105227e150150bc3f36a5070f240254a10"
+    },
+    {
+      "path": "validation/mcp_tests.py",
+      "extracted_from": "ControlPlane/services/validation/mcp_tests.py",
+      "sha256": "e8044a0ec7d53d2ec63ef38c19a840aeab7c7d523e169aac0dfca5c3e25d3013"
+    },
+    {
+      "path": "validation/protocol_probe.py",
+      "extracted_from": "ControlPlane/services/validation/protocol_probe.py",
+      "sha256": "1a93e049f1539ee557ccb8193dba5cffed2ec6af2d0bfa49a3abfd47bba08d2e"
+    },
+    {
+      "path": "validation/requirements.lock",
+      "extracted_from": "ControlPlane/services/validation/requirements.lock",
+      "sha256": "52e66ec3713d6aa0d4156465c852355d76bf0278463d8baa426f58d8a9910bbe"
+    },
+    {
+      "path": "validation/tests.py",
+      "extracted_from": "ControlPlane/services/validation/tests.py",
+      "sha256": "80f68d56af2db4640244041727fdedd7e07ebeef628d5dcb0afcce451c621604"
+    },
+    {
+      "path": "validation/worker.py",
+      "extracted_from": "ControlPlane/services/validation/worker.py",
+      "sha256": "596539474206fd3062667a71c09c7b25ff7e96445ad66693f9a7ebf197baef22"
+    },
+    {
+      "path": "execution/adapter_tests.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/adapter_tests.py",
+      "sha256": "f34388c558318fe8b72bac019709dc5b7c760cf1351000b8fa13ddf5c78fb379"
+    },
+    {
+      "path": "execution/adapters.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/adapters.py",
+      "sha256": "ecde056487a0f2756b18c1f2b0c16540dd43b9744d9c4b6e0ab3a4a4a2d976fd"
+    },
+    {
+      "path": "execution/audit_coverage.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/audit_coverage.py",
+      "sha256": "920a33fabc7da19418a2f2e33afea92ef0d173a56859b8b0ca4807306a0b7633"
+    },
+    {
+      "path": "execution/bindings.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/bindings.py",
+      "sha256": "82f51c6e8f956c7692dfef08d07b75a0f0a460b4fae9834cbd01c88a1870c91f"
+    },
+    {
+      "path": "execution/bindings.schema.json",
+      "extracted_from": "ControlPlane/services/pascode-execution/bindings.schema.json",
+      "sha256": "9bc27bad05275c13110ac84058b133754d5e025f642372d564b2d9fa1857cf44"
+    },
+    {
+      "path": "execution/deployment.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/deployment.py",
+      "sha256": "d51a6aaf1d2f6e6d1350aab39360fe888cb22d5d194f65b80675d0a55c2e00fb"
+    },
+    {
+      "path": "execution/deployment_tests.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/deployment_tests.py",
+      "sha256": "e67f3a774cfadf5149ca0313d1339f6761eed4858b751075db471a5a97c62af3"
+    },
+    {
+      "path": "execution/runner.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/runner.py",
+      "sha256": "cd46a46389842e72d4c7bc727227f315b7fa64bdc9e7f43422136dae289039d0"
+    },
+    {
+      "path": "execution/tests.py",
+      "extracted_from": "ControlPlane/services/pascode-execution/tests.py",
+      "sha256": "6a56418120bcb2c4e65f9e1b45c97176ca76aa5c764c9843991a273f6085d82e"
+    },
+    {
+      "path": "prompt-tests/generate.py",
+      "extracted_from": "CloisterDoraTeura/pascode/tools/prompt-tests/generate.py",
+      "sha256": "6080b04a8b4f4a7402843def4162b87bb9a406d0adff8c1fcf03554b6f1db202"
+    },
+    {
+      "path": "prompt-tests/test_generate.py",
+      "extracted_from": "CloisterDoraTeura/pascode/tools/prompt-tests/test_generate.py",
+      "sha256": "61c2f9c58b02f4351a3446d778587503470742738a4d940040c67eaca1f25f5d"
+    }
+  ]
+}

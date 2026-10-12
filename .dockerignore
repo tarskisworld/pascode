@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!validation/
+!validation/*.py
+!validation/requirements.lock
+!execution/
+!execution/*.py
+!execution/bindings.schema.json
+!prompt-tests/
+!prompt-tests/*.py
