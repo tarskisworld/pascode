@@ -113,7 +113,7 @@
     },
     {
       "path": "legacy-jira/run_generated_static_tests.py",
-      "sha256": "87da06bd1c1b824be10402cca8e9e7bd23a521f4ebdc64b45126c61a78f0322f",
+      "sha256": "d7eac24797e594ffd46150ad1b1967dafbba4d1cfe98845b240a252522be7737",
       "extraction": "Existing implementation unified; instance settings externalized, dialect retained"
     },
     {
