@@ -3,6 +3,12 @@
 Container-backed configuration tooling with a shared CLI, per-project declarations
 and a signed APT update feed. Current release: **0.1.0**.
 
+**Current tested distribution:** Debian/Ubuntu amd64, including Ubuntu under WSL,
+with a working Docker daemon. Native Windows, macOS and ARM64 installers are not
+yet available. See the [cross-platform distribution requirements](docs/portability.md)
+for the reassessment and acceptance plan; containerized execution does not make
+the current Linux host launcher portable by itself.
+
 ## Install on Debian or Ubuntu
 
 Currently supported package architecture: **amd64**, including Ubuntu on WSL.
