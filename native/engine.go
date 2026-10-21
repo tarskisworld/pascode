@@ -109,11 +109,23 @@ func (a app) setup() error {
 		if hex.EncodeToString(h.Sum(nil)) != a.config.SHA256 {
 			return fmt.Errorf("engine archive checksum mismatch")
 		}
-		if e = a.run(a.docker, []string{"load", "--input", a.config.Archive}, nil); e != nil {
-			return e
+		loaded, loadErr := a.capture(a.docker, "load", "--input", a.config.Archive)
+		if loadErr != nil {
+			return fmt.Errorf("failed to load verified engine archive: %w", loadErr)
 		}
 		if _, e = a.capture(a.docker, "image", "inspect", a.config.Image); e != nil {
-			return fmt.Errorf("loaded archive did not provide the expected image")
+			// Some Docker versions rewrite image metadata while importing an
+			// archive, changing its local ID. The checked archive still pins
+			// the bytes; store the actual local ID for later immutable runs.
+			match := regexp.MustCompile(`(?m)^Loaded image ID: (sha256:[a-f0-9]{64})$`).FindStringSubmatch(loaded)
+			if len(match) != 2 {
+				return fmt.Errorf("Docker loaded the engine but did not report an image ID")
+			}
+			a.config.Image = match[1]
+		}
+		actual, e := a.capture(a.docker, "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", a.config.Image)
+		if e != nil || actual != a.config.Platform {
+			return fmt.Errorf("loaded image platform does not match the release")
 		}
 	}
 	home, e := homeDir()

@@ -57,7 +57,7 @@ user-run system keyring refresh.
 Branch: `codex/portable-cli`; review: https://github.com/tarskisworld/pascode/pull/2.
 Tracking: ControlPlane issues 11 (portable host launcher), 12 (native installers),
 and 13 (clean-runner validation). The native preview uses `NATIVE_VERSION`
-`0.2.0-rc.1`; the stable APT feed and `VERSION` remain at `0.1.0`.
+`0.2.0-rc.2`; the stable APT feed and `VERSION` remain at `0.1.0`.
 
 Implemented: standard-library Go host command with Windows and Unix state locks,
 Docker cancellation cleanup, selected credential forwarding, explicit setup and
@@ -69,8 +69,14 @@ spaces and corrupt artifacts. Both engine architecture jobs passed on the first
 CI run, as did Linux and macOS native jobs. Windows repeat install found a missing
 backup path in file replacement; fixed on the branch. A new full matrix is running.
 
-Next: confirm both Windows architectures, publish a prerelease without changing
-the stable `latest` APT feed, download-install-test the published assets, and update
+All eight CI jobs passed for preview 1, including both Windows architectures and
+both PowerShell editions. Its public download and checksum verification succeeded,
+but a clean `setup` exposed a Docker import mismatch: the local daemon assigned a
+new image ID to the verified CI-built archive. Preview 1 was withdrawn. Preview 2
+records the actual local immutable ID after loading and checks the image platform.
+
+Next: rebuild and validate preview 2, publish it without changing the stable
+`latest` APT feed, download-install-test the published assets, and update
 user-facing platform instructions. Hosted Windows/macOS checks do not yet prove
 Docker Desktop execution. Windows code signing and macOS distribution identity
 remain open; native artifacts must be labeled preview until publisher trust and

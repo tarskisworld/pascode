@@ -3,7 +3,7 @@
 The user requires installation by another person on another machine, rather than
 commands specialized for the development workstation. This document records the
 implemented native preview and the remaining acceptance criteria. Version 0.1.0
-remains the published stable release; native preview assets are not yet published.
+remains the published stable release; native preview 0.2.0-rc.2 is in validation.
 
 ## Current release evidence
 
@@ -76,8 +76,10 @@ The native Linux launcher completed setup against the local Docker daemon, then
 validated five existing fixture contracts and generated mapping and bindings.
 These checks make no live provider calls. GitHub Actions build x86-64 and ARM64
 Linux engines and run native tests and installer checks on Linux, macOS and Windows
-runners. The current Windows repeat-install failure has been corrected and its
-rerun is pending. Hosted macOS and Windows checks exercise their native commands
+runners. All six native runner checks passed for preview 1. A public download test
+then exposed a Docker import difference: this daemon assigned the verified archive
+a different local image ID. Preview 1 was withdrawn; preview 2 now verifies the
+loaded platform and records the local immutable ID. Hosted macOS and Windows checks exercise their native commands
 and installers without Docker Desktop; container execution there still needs
 separate evidence. The Windows executable is unsigned, so a publisher warning may
 appear. Signing requires a certificate and distribution policy before a general

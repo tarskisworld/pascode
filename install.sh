@@ -1,7 +1,7 @@
 #!/bin/sh
 # Native per-user release installer. No checkout, root, Bash or jq required.
 set -eu
-version=${PASCODE_VERSION:-0.2.0-rc.1}
+version=${PASCODE_VERSION:-0.2.0-rc.2}
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo 'Invalid release version' >&2; exit 2; }
 case "$(uname -s)" in Linux) system=linux ;; Darwin) system=darwin ;; *) echo 'Use install.ps1 on Windows; this installer supports Linux and macOS' >&2; exit 2 ;; esac
 case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *) echo 'Unsupported CPU architecture' >&2; exit 2 ;; esac
