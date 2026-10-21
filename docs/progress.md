@@ -75,9 +75,14 @@ but a clean `setup` exposed a Docker import mismatch: the local daemon assigned 
 new image ID to the verified CI-built archive. Preview 1 was withdrawn. Preview 2
 records the actual local immutable ID after loading and checks the image platform.
 
-Next: rebuild and validate preview 2, publish it without changing the stable
-`latest` APT feed, download-install-test the published assets, and update
-user-facing platform instructions. Hosted Windows/macOS checks do not yet prove
-Docker Desktop execution. Windows code signing and macOS distribution identity
-remain open; native artifacts must be labeled preview until publisher trust and
-desktop engine checks are resolved. No live Jira apply was run.
+Preview 2 completed all eight CI jobs: two engine builds, four Unix native jobs
+and two Windows native jobs. Linux x86-64 and ARM64 runners both loaded their
+release engine archives and passed setup/doctor. The public prerelease at
+https://github.com/tarskisworld/pascode/releases/tag/v0.2.0-rc.2 has 13 assets.
+An isolated Linux amd64 download verified the installer checksum, installed the
+public assets, loaded the engine and passed doctor/version. GitHub still reports
+`v0.1.0` as latest, so the signed APT feed is unchanged. The README now gives
+clone-free installation commands. Preview 1 stays withdrawn. Remaining acceptance:
+Docker Desktop execution on native macOS/Windows, publisher signing/notarization,
+and tested minimum OS/runtime versions. Do not close the corresponding tasks yet.
+No live Jira apply was run.

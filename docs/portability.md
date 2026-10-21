@@ -3,7 +3,8 @@
 The user requires installation by another person on another machine, rather than
 commands specialized for the development workstation. This document records the
 implemented native preview and the remaining acceptance criteria. Version 0.1.0
-remains the published stable release; native preview 0.2.0-rc.2 is in validation.
+remains the published stable release; native preview 0.2.0-rc.2 is published as a
+prerelease.
 
 ## Current release evidence
 
@@ -76,10 +77,12 @@ The native Linux launcher completed setup against the local Docker daemon, then
 validated five existing fixture contracts and generated mapping and bindings.
 These checks make no live provider calls. GitHub Actions build x86-64 and ARM64
 Linux engines and run native tests and installer checks on Linux, macOS and Windows
-runners. All six native runner checks passed for preview 1. A public download test
-then exposed a Docker import difference: this daemon assigned the verified archive
-a different local image ID. Preview 1 was withdrawn; preview 2 now verifies the
-loaded platform and records the local immutable ID. Hosted macOS and Windows checks exercise their native commands
+runners. All six native runner checks pass for preview 2. Preview 1 was withdrawn
+after a public download test found a Docker import ID difference. Preview 2 verifies
+the loaded platform and records the local immutable ID. Linux CI imports the engine
+on both CPU architectures and passes setup/doctor. An isolated public download of
+preview 2 also passed checksum verification, installation, setup, doctor and version
+on Linux amd64. Hosted macOS and Windows checks exercise their native commands
 and installers without Docker Desktop; container execution there still needs
 separate evidence. The Windows executable is unsigned, so a publisher warning may
 appear. Signing requires a certificate and distribution policy before a general
@@ -87,3 +90,22 @@ release; checksum verification alone does not establish publisher identity.
 
 Preserve the working 0.1.0 APT installation during this work. No new platform
 artifact is marked generally supported until its acceptance criteria pass.
+
+## Preview installation lifecycle
+
+The native installers retain each installed version under the user's `.pascode`
+directory. Re-run the same versioned installer to verify an existing installation;
+use a newer versioned installer to upgrade. Setup explicitly adopts its bundled
+engine for that user. To roll back, run the installer for a previous healthy
+published version and then run setup and doctor. Do not roll back deployment state
+without checking compatibility with the older engine. Withdrawn preview 1 is not
+a rollback target.
+
+On Unix the command is a managed link in `~/.local/bin`; on Windows it is the
+managed executable in `%USERPROFILE%\.pascode\bin`. To remove a preview, first
+stop using the command, then remove only that managed command and the corresponding
+version directory. Leave `config.json`, credentials and per-project deployment
+state in place unless the owner explicitly chooses to remove them. The Unix
+installer refuses to replace a custom command; the Windows installer checks its
+managed record and executable hash before replacement. Package-manager installs
+on Debian/Ubuntu have their own APT removal path.
