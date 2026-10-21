@@ -1,0 +1,93 @@
+name: Native portability
+on:
+  push:
+    branches: [main, codex/portable-cli]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.27.3
+          cache: false
+      - name: Build native engine and release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/native-assets
+          docker build --platform linux/${{ matrix.arch }} --iidfile build/image-id .
+          image=$(cat build/image-id)
+          test "$(docker image inspect "$image" --format '{{.Architecture}}')" = '${{ matrix.arch }}'
+          docker save "$image" | gzip -n > build/engine.tar.gz
+          cd native
+          go test ./...
+          go run ./cmd/package -image "$image" -arch '${{ matrix.arch }}' -engine ../build/engine.tar.gz -output ../build/native-assets
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-${{ matrix.arch }}
+          path: build/native-assets/
+          retention-days: 7
+  native:
+    needs: engine
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version: 1.27.3
+          cache: false
+      - name: Native tests and static checks
+        working-directory: native
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./...
+          go vet ./...
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: native-*
+          path: build/native-assets
+          merge-multiple: true
+      - name: Unix installer acceptance
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cat build/native-assets/SHA256SUMS-* > build/native-assets/SHA256SUMS
+          sh tests/install-native.sh build/native-assets
+      - name: Linux release engine import
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sh tests/native-engine-smoke.sh build/native-assets
+      - name: PowerShell installer acceptance
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-Content build/native-assets/SHA256SUMS-* | Set-Content -Encoding ascii build/native-assets/SHA256SUMS
+          ./tests/install-native.ps1 -Assets build/native-assets
+      - name: Windows PowerShell installer compatibility
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tests/install-native.ps1 -Assets build/native-assets

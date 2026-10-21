@@ -3,6 +3,11 @@
 Container-backed configuration tooling with a shared CLI, per-project declarations
 and a signed APT update feed. Current release: **0.1.0**.
 
+**Stable distribution:** Debian/Ubuntu amd64, including Ubuntu under WSL, with a
+working Docker daemon. A separate native preview provides Linux, macOS and Windows
+installers for x86-64 and ARM64. See [native distribution status](docs/portability.md)
+for what has been tested on each platform.
+
 ## Install on Debian or Ubuntu
 
 Currently supported package architecture: **amd64**, including Ubuntu on WSL.
@@ -52,6 +57,40 @@ Use sudo only for system installation and APT configuration; run setup as your
 ordinary user. Re-running the block refreshes only the pascode-owned key/source/
 preference files and package setup. For a checkout-based helper that refuses
 differing existing APT files, see [APT setup](docs/apt-repository.md).
+
+## Native preview without a source checkout
+
+Preview `0.2.0-rc.2` installs per user on Linux, macOS or Windows. It needs a
+working Docker Linux-container daemon for `setup` and engine commands; the host
+command itself needs no Go, Python, Terraform or source checkout. On Linux/macOS,
+run in a terminal:
+
+```sh
+curl -fsSL https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.sh | sh
+"$HOME/.local/bin/pascodectl" doctor
+```
+
+On Windows, run in PowerShell:
+
+```powershell
+irm 'https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.ps1' | iex
+& "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
+```
+
+The installer selects the CPU architecture, checks the downloaded package and
+engine hashes against the release manifest, and runs setup when Docker is
+available. If Docker is installed later, run the installed command's `setup`,
+then `doctor`. The Unix installer prints PATH guidance when `~/.local/bin` is not
+already on PATH; Windows adds its per-user bin directory to future terminals.
+Use the full command path shown above in the current terminal when needed.
+Re-running the versioned installer verifies and reuses the installed version.
+
+This is a preview. Linux runners on both architectures have imported the engine
+and passed setup/doctor. Native installer and CLI checks passed on both macOS and
+Windows architectures, but Docker Desktop execution there remains unverified.
+The Windows executable is unsigned and can show a publisher warning; macOS
+artifacts are not notarized. The signed Debian APT feed continues to use stable
+`0.1.0` and is unaffected by this prerelease.
 
 ## Upgrade
 

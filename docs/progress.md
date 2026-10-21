@@ -51,3 +51,38 @@ The user's APT run also reported a separate GitHub CLI archive-key warning.
 It does not affect the P as code feed; the current official GitHub CLI keyring was
 downloaded and its published SHA-256 and live signature verified for a separate
 user-run system keyring refresh.
+
+## Native distribution preview
+
+Branch: `codex/portable-cli`; review: https://github.com/tarskisworld/pascode/pull/2.
+Tracking: ControlPlane issues 11 (portable host launcher), 12 (native installers),
+and 13 (clean-runner validation). The native preview uses `NATIVE_VERSION`
+`0.2.0-rc.2`; the stable APT feed and `VERSION` remain at `0.1.0`.
+
+Implemented: standard-library Go host command with Windows and Unix state locks,
+Docker cancellation cleanup, selected credential forwarding, explicit setup and
+doctor; SHA-256 checked per-user Unix and PowerShell installers; Linux/macOS/Windows
+x86-64 and ARM64 asset builder; and six-platform GitHub Actions matrix. The local
+Linux native install completed real Docker setup, five-contract offline validation,
+mapping and bindings. Native Unix installer tests cover repeat install, paths with
+spaces and corrupt artifacts. Both engine architecture jobs passed on the first
+CI run, as did Linux and macOS native jobs. Windows repeat install found a missing
+backup path in file replacement; fixed on the branch. A new full matrix is running.
+
+All eight CI jobs passed for preview 1, including both Windows architectures and
+both PowerShell editions. Its public download and checksum verification succeeded,
+but a clean `setup` exposed a Docker import mismatch: the local daemon assigned a
+new image ID to the verified CI-built archive. Preview 1 was withdrawn. Preview 2
+records the actual local immutable ID after loading and checks the image platform.
+
+Preview 2 completed all eight CI jobs: two engine builds, four Unix native jobs
+and two Windows native jobs. Linux x86-64 and ARM64 runners both loaded their
+release engine archives and passed setup/doctor. The public prerelease at
+https://github.com/tarskisworld/pascode/releases/tag/v0.2.0-rc.2 has 13 assets.
+An isolated Linux amd64 download verified the installer checksum, installed the
+public assets, loaded the engine and passed doctor/version. GitHub still reports
+`v0.1.0` as latest, so the signed APT feed is unchanged. The README now gives
+clone-free installation commands. Preview 1 stays withdrawn. Remaining acceptance:
+Docker Desktop execution on native macOS/Windows, publisher signing/notarization,
+and tested minimum OS/runtime versions. Do not close the corresponding tasks yet.
+No live Jira apply was run.
