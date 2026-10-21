@@ -12,6 +12,10 @@ image ID/digest. Normal commands run packaged code, with no source bind mount.
 An explicit development build can be made with `docker build --iidfile IMAGE_ID .`.
 The environment integration installs the launcher by content hash and pins the image.
 
+The shared user installation now lives in `~/.pascode`, independently of the
+ControlPlane source checkout. See [local installation](docs/local-installation.md)
+for installation, layout, compatibility paths and recovery boundaries.
+
 Commands retain validate/map/bindings/plan/apply/verify and positional arguments.
 Offline work is networkless. Deployment Python and Terraform jobs receive only
 selected credentials/bindings and the private work directory. Host locking still

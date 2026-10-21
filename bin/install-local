@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Install host launchers for an existing immutable engine. Never build or pull.
+set -euo pipefail
+task_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+task_image=${1:-}
+task_install=${2:-${PASCODE_HOME:-$HOME/.pascode}}
+task_path_bin=${3:-$HOME/.local/bin}
+[[ $# -ge 1 && $# -le 3 ]] || { echo 'Usage: install-local IMMUTABLE_IMAGE [INSTALL_ROOT] [PATH_BIN_DIRECTORY]' >&2; exit 2; }
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'Engine image must be immutable' >&2; exit 2; }
+docker image inspect "$task_image" >/dev/null
+mkdir -p -- "$task_install/packages" "$task_install/bin" "$task_path_bin"
+task_install=$(realpath -- "$task_install")
+task_env=$(mktemp "$task_install/.runtime.XXXXXX")
+trap 'rm -f -- "$task_env"' EXIT
+printf 'PASCODE_IMAGE=%q\n' "$task_image" > "$task_env"
+for task_name in pascodectl prompt-tests jira-analysis; do
+  task_hash=$(sha256sum "$task_source/bin/$task_name" | cut -d' ' -f1)
+  task_package="$task_install/packages/$task_hash"
+  mkdir -p -- "$task_package"
+  if [[ -e "$task_package/$task_name" ]]; then
+    cmp "$task_source/bin/$task_name" "$task_package/$task_name"
+  else
+    install -m 0555 "$task_source/bin/$task_name" "$task_package/$task_name"
+  fi
+  case "$task_name" in
+    pascodectl) task_key=PASCODE_CLI ;;
+    prompt-tests) task_key=PASCODE_PROMPT_CLI ;;
+    jira-analysis) task_key=PASCODE_ANALYSIS_CLI ;;
+  esac
+  printf '%s=%q\n' "$task_key" "$task_package/$task_name" >> "$task_env"
+  task_wrapper=$(mktemp "$task_install/bin/.wrapper.XXXXXX")
+  printf '#!/usr/bin/env bash\nset -euo pipefail\ntask_bin=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)\nexec bash "$task_bin/runtime-command" %q "$@"\n' "$task_name" > "$task_wrapper"
+  chmod 755 "$task_wrapper"
+  mv -f -- "$task_wrapper" "$task_install/bin/$task_name"
+done
+install -m 0555 "$task_source/bin/runtime-command" "$task_install/bin/runtime-command"
+chmod 644 "$task_env"
+mv -f -- "$task_env" "$task_install/runtime.env"
+task_wrapper=$(mktemp "$task_path_bin/.pascodectl.XXXXXX")
+printf '#!/usr/bin/env bash\nset -euo pipefail\nexec bash %q "$@"\n' "$task_install/bin/pascodectl" > "$task_wrapper"
+chmod 755 "$task_wrapper"
+mv -f -- "$task_wrapper" "$task_path_bin/pascodectl"
+printf 'Installed shared P as code runtime in %s\n' "$task_install"
