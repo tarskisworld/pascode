@@ -36,11 +36,18 @@ public key/client configuration, explicit release publisher and isolated APT
 acceptance/tamper/download tests are implemented. Local tests passed. Release
 `v0.1.0` is public at `https://github.com/tarskisworld/pascode/releases/tag/v0.1.0`.
 An isolated APT client accepted the live GitHub index and downloaded a byte-identical
-87.2 MB package through the latest-release redirects. The user's one-time sudo
-APT configuration remains pending; system APT settings were not changed by the
-test. Temporary signing files were removed after gopass recovery verification.
+87.2 MB package through the latest-release redirects. The user configured the
+system feed and ran APT update successfully on 2026-10-20. Independently verified
+the installed public key matches, source/preferences files exist, and APT lists
+the package from the live feed. The isolated test did not change system APT
+settings. Temporary signing files were removed after gopass recovery verification.
 No existing login credentials or deployment state changed.
 Selective ControlPlane integration remains separate; do not commit its unrelated
 changes. See [APT repository governance and setup](apt-repository.md).
 
 Source review: https://github.com/tarskisworld/pascode/pull/1 (not merged).
+
+The user's APT run also reported a separate GitHub CLI archive-key warning.
+It does not affect the P as code feed; the current official GitHub CLI keyring was
+downloaded and its published SHA-256 and live signature verified for a separate
+user-run system keyring refresh.
