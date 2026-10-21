@@ -34,8 +34,12 @@ execution isolation remain defined by the existing content-addressed launchers.
 The runtime configuration contains no credentials; it is trusted executable shell
 configuration owned by the installing user. No project configuration is sourced.
 
-The CLI still uses its existing positional command contract; this change does not
-add `version` or change supported declaration dialects.
+The CLI preserves its existing positional contract and adds version/help,
+diagnostics, named options and project discovery. See the
+[Debian package and CLI contract](debian-package.md) for the feature map, standard
+system paths, package setup and semantic version policy. Declaration dialects
+are unchanged. `PASCODE_INSTALL_PATH_COMMAND=0` suppresses PATH shim installation
+when a system package already owns the public command.
 
 Run `bash tests/install-local.sh IMMUTABLE_IMAGE_ID` to check repeat installation,
 paths with spaces and quotes, dispatch outside the checkout and rejection of

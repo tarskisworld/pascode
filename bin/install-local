@@ -4,7 +4,7 @@ set -euo pipefail
 task_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 task_image=${1:-}
 task_install=${2:-${PASCODE_HOME:-$HOME/.pascode}}
-task_path_bin=${3:-$HOME/.local/bin}
+task_path_bin=${3:-${PASCODE_USER_BIN_DIR:-$HOME/.local/bin}}
 [[ $# -ge 1 && $# -le 3 ]] || { echo 'Usage: install-local IMMUTABLE_IMAGE [INSTALL_ROOT] [PATH_BIN_DIRECTORY]' >&2; exit 2; }
 [[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'Engine image must be immutable' >&2; exit 2; }
 docker image inspect "$task_image" >/dev/null
@@ -34,10 +34,16 @@ for task_name in pascodectl prompt-tests jira-analysis; do
   mv -f -- "$task_wrapper" "$task_install/bin/$task_name"
 done
 install -m 0555 "$task_source/bin/runtime-command" "$task_install/bin/runtime-command"
+install -m 0555 "$task_source/bin/cli" "$task_install/bin/cli"
+install -m 0444 "$task_source/VERSION" "$task_install/VERSION"
+printf '#!/usr/bin/env bash\nset -euo pipefail\ntask_bin=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)\nexec bash "$task_bin/cli" "$@"\n' > "$task_install/bin/pascodectl"
+chmod 755 "$task_install/bin/pascodectl"
 chmod 644 "$task_env"
 mv -f -- "$task_env" "$task_install/runtime.env"
-task_wrapper=$(mktemp "$task_path_bin/.pascodectl.XXXXXX")
-printf '#!/usr/bin/env bash\nset -euo pipefail\nexec bash %q "$@"\n' "$task_install/bin/pascodectl" > "$task_wrapper"
-chmod 755 "$task_wrapper"
-mv -f -- "$task_wrapper" "$task_path_bin/pascodectl"
+if [[ ${PASCODE_INSTALL_PATH_COMMAND:-1} == 1 ]]; then
+  task_wrapper=$(mktemp "$task_path_bin/.pascodectl.XXXXXX")
+  printf '#!/usr/bin/env bash\nset -euo pipefail\nexec bash %q "$@"\n' "$task_install/bin/pascodectl" > "$task_wrapper"
+  chmod 755 "$task_wrapper"
+  mv -f -- "$task_wrapper" "$task_path_bin/pascodectl"
+fi
 printf 'Installed shared P as code runtime in %s\n' "$task_install"

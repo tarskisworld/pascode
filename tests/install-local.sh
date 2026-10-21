@@ -17,11 +17,8 @@ cmp "$task_source/bin/prompt-tests" "$PASCODE_PROMPT_CLI"
 cmp "$task_source/bin/jira-analysis" "$PASCODE_ANALYSIS_CLI"
 # Invoke from outside the checkout, with no source access in the worker.
 cd "$task_tmp"
-if "$task_path/pascodectl" version > "$task_tmp/usage" 2>&1; then
-  echo 'Unsupported version command unexpectedly succeeded' >&2; exit 1
-else
-  test "$?" = 2
-fi
+test "$("$task_path/pascodectl" version)" = "pascodectl $(cat "$task_source/VERSION")"
+"$task_path/pascodectl" --help > "$task_tmp/usage"
 rg -q 'Usage: pascodectl' "$task_tmp/usage"
 if bash "$task_source/bin/install-local" latest "$task_tmp/rejected" "$task_path" > "$task_tmp/rejected-output" 2>&1; then
   echo 'Mutable image unexpectedly accepted' >&2; exit 1

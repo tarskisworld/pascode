@@ -16,6 +16,12 @@ The shared user installation now lives in `~/.pascode`, independently of the
 ControlPlane source checkout. See [local installation](docs/local-installation.md)
 for installation, layout, compatibility paths and recovery boundaries.
 
+The CLI is versioned from `VERSION` using semantic versioning. `pascodectl version`
+and `pascodectl --help` work without starting Docker. An offline Debian package
+provides the standard `/usr/bin/pascodectl` installation; see the
+[package and CLI contract](docs/debian-package.md) for setup, feature coverage,
+upgrades and the previous-launcher handoff.
+
 Commands retain validate/map/bindings/plan/apply/verify and positional arguments.
 Offline work is networkless. Deployment Python and Terraform jobs receive only
 selected credentials/bindings and the private work directory. Host locking still
