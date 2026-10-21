@@ -58,7 +58,11 @@ try {
   }
   $pendingCommand = Join-Path $BinDir ('.pascodectl-' + [Guid]::NewGuid().ToString('N') + '.exe')
   Copy-Item -LiteralPath (Join-Path $destination 'pascodectl.exe') -Destination $pendingCommand
-  if (Test-Path -LiteralPath $command) { [IO.File]::Replace($pendingCommand,$command,$null) }
+  if (Test-Path -LiteralPath $command) {
+    $backupCommand = Join-Path $BinDir ('.pascodectl-backup-' + [Guid]::NewGuid().ToString('N') + '.exe')
+    [IO.File]::Replace($pendingCommand,$command,$backupCommand)
+    Remove-Item -LiteralPath $backupCommand -Force
+  }
   else { [IO.File]::Move($pendingCommand,$command) }
   $config = Get-Content -Raw -LiteralPath (Join-Path $destination 'engine.json') | ConvertFrom-Json
   $config.archive = Join-Path $destination $engine
