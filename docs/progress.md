@@ -51,3 +51,27 @@ The user's APT run also reported a separate GitHub CLI archive-key warning.
 It does not affect the P as code feed; the current official GitHub CLI keyring was
 downloaded and its published SHA-256 and live signature verified for a separate
 user-run system keyring refresh.
+
+## Native distribution preview
+
+Branch: `codex/portable-cli`; review: https://github.com/tarskisworld/pascode/pull/2.
+Tracking: ControlPlane issues 11 (portable host launcher), 12 (native installers),
+and 13 (clean-runner validation). The native preview uses `NATIVE_VERSION`
+`0.2.0-rc.1`; the stable APT feed and `VERSION` remain at `0.1.0`.
+
+Implemented: standard-library Go host command with Windows and Unix state locks,
+Docker cancellation cleanup, selected credential forwarding, explicit setup and
+doctor; SHA-256 checked per-user Unix and PowerShell installers; Linux/macOS/Windows
+x86-64 and ARM64 asset builder; and six-platform GitHub Actions matrix. The local
+Linux native install completed real Docker setup, five-contract offline validation,
+mapping and bindings. Native Unix installer tests cover repeat install, paths with
+spaces and corrupt artifacts. Both engine architecture jobs passed on the first
+CI run, as did Linux and macOS native jobs. Windows repeat install found a missing
+backup path in file replacement; fixed on the branch. A new full matrix is running.
+
+Next: confirm both Windows architectures, publish a prerelease without changing
+the stable `latest` APT feed, download-install-test the published assets, and update
+user-facing platform instructions. Hosted Windows/macOS checks do not yet prove
+Docker Desktop execution. Windows code signing and macOS distribution identity
+remain open; native artifacts must be labeled preview until publisher trust and
+desktop engine checks are resolved. No live Jira apply was run.

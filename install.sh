@@ -34,9 +34,12 @@ verify "$archive"
 fetch "$engine"
 verify "$engine"
 tar -tzf "$stage/$archive" > "$stage/contents"
+tar -tvzf "$stage/$archive" | awk 'substr($0,1,1)!="-" {exit 1}' || { echo 'Release contains a link or other unsupported member' >&2; exit 1; }
+[ "$(wc -l < "$stage/contents")" -eq 3 ] || { echo 'Release contents are incomplete or repeated' >&2; exit 1; }
 while IFS= read -r name; do
   case "$name" in pascodectl|engine.json|README.md) ;; *) echo 'Unexpected archive member' >&2; exit 1 ;; esac
 done < "$stage/contents"
+[ "$(sort "$stage/contents" | uniq -d | wc -l)" -eq 0 ] || { echo 'Release contains duplicate members' >&2; exit 1; }
 mkdir "$stage/package"
 tar -xzf "$stage/$archive" -C "$stage/package"
 for name in pascodectl engine.json README.md; do
