@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Explicit publication entry point. Building alone never calls this script.
+set -euo pipefail
+task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+task_feed=${1:?Usage: publish-apt SIGNED_FEED_DIRECTORY PUSHED_SOURCE_COMMIT}
+task_commit=${2:?Supply the pushed source commit}
+task_version=$(cat "$task_root/VERSION")
+task_tag="v$task_version"
+[[ "$task_commit" =~ ^[a-f0-9]{40}$ ]] || { echo 'Use the full reviewed source commit' >&2; exit 2; }
+task_repo=tarskisworld/pascode
+gh api "repos/$task_repo/commits/$task_commit" --jq .sha >/dev/null
+if gh release view "$task_tag" --repo "$task_repo" >/dev/null 2>&1; then
+  echo 'Release already exists; never replace published package bytes' >&2; exit 2
+fi
+cmp "$task_root/packaging/apt/pascode-archive-keyring.gpg" "$task_feed/pascode-archive-keyring.gpg"
+gpgv --keyring "$task_root/packaging/apt/pascode-archive-keyring.gpg" "$task_feed/InRelease"
+[[ -f "$task_feed/pascode_${task_version}_amd64.deb" ]] || { echo 'Current version package is missing' >&2; exit 2; }
+task_tmp=$(mktemp -d)
+trap 'rm -rf -- "$task_tmp"' EXIT
+if task_previous=$(gh release view --repo "$task_repo" --json tagName --jq .tagName 2>/dev/null); then
+  gh release view "$task_previous" --repo "$task_repo" --json assets --jq '.assets[].name' > "$task_tmp/assets"
+  while IFS= read -r task_name; do
+    [[ "$task_name" == *.deb ]] || continue
+    [[ -f "$task_feed/$task_name" ]] || { echo 'Retain previous package assets for cached APT clients' >&2; exit 2; }
+    gh release download "$task_previous" --repo "$task_repo" --pattern "$task_name" --dir "$task_tmp"
+    cmp "$task_tmp/$task_name" "$task_feed/$task_name"
+  done < "$task_tmp/assets"
+fi
+cat > "$task_tmp/notes" <<EOF
+P as code $task_version — container-backed CLI and signed APT update feed.
+
+APT base: https://github.com/tarskisworld/pascode/releases/latest/download/
+Public key fingerprint: $(cat "$task_root/packaging/apt/pascode-archive-keyring.fingerprint")
+
+See docs/apt-repository.md at the tagged source commit for client setup and key governance.
+EOF
+# Upload only archive assets, never arbitrary files or signing credentials.
+task_assets=("$task_feed"/*.deb "$task_feed/Packages" "$task_feed/Packages.gz"
+  "$task_feed/Release" "$task_feed/InRelease" "$task_feed/Release.gpg"
+  "$task_feed/pascode-archive-keyring.gpg" "$task_feed/pascode-archive-keyring.fingerprint"
+  "$task_feed/pascode.sources")
+gh release create "$task_tag" "${task_assets[@]}" --repo "$task_repo" --draft \
+  --target "$task_commit" --title "P as code $task_version" --notes-file "$task_tmp/notes"
+gh release edit "$task_tag" --repo "$task_repo" --draft=false --latest

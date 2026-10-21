@@ -30,6 +30,11 @@ validation passes all five MainSystem contracts. The previous home dispatcher,
 runtime pin file and PATH shim are backed up under
 `~/.pascode/migrations/cli-0.1.0/`. The engine image is unchanged.
 
-No local installation step remains. Source publication and selective ControlPlane
-integration remain pending authorization. Do not commit unrelated ControlPlane
-changes or migrate project state or credentials.
+No local package installation step remains. The user subsequently requested an
+update feed hosted by the P as code GitHub repository. Signed Release metadata,
+public key/client configuration, explicit release publisher and isolated APT
+acceptance/tamper/download tests are implemented. Local tests passed. GitHub
+publication/live-feed validation and the user's one-time sudo APT configuration
+are in progress. No existing login credentials or deployment state changed.
+Selective ControlPlane integration remains separate; do not commit its unrelated
+changes. See [APT repository governance and setup](apt-repository.md).

@@ -22,6 +22,11 @@ provides the standard `/usr/bin/pascodectl` installation; see the
 [package and CLI contract](docs/debian-package.md) for setup, feature coverage,
 upgrades and the previous-launcher handoff.
 
+The [signed APT feed](docs/apt-repository.md) is hosted using this repository's
+GitHub Release assets. One-time client configuration scopes its public signing
+key and permits only the pascode package from the feed. Package upgrades use
+standard APT; adopting an upgraded engine remains explicit per-user setup.
+
 Commands retain validate/map/bindings/plan/apply/verify and positional arguments.
 Offline work is networkless. Deployment Python and Terraform jobs receive only
 selected credentials/bindings and the private work directory. Host locking still

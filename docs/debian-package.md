@@ -77,7 +77,8 @@ contract. During 0.x development a minor release may introduce documented breaki
 changes. The package version and reported CLI version derive from the same file.
 The immutable engine ID is a separate runtime pin, not a semantic version alias.
 The build currently accepts stable three-part versions; prerelease publishing,
-signed APT hosting, self-update and project scaffolding are future work.
+self-update and project scaffolding are future work. The
+[signed APT feed](apt-repository.md) supplies normal package-manager updates.
 
 The builder writes a sibling `.deb.sha256` checksum. Verify it with
 `sha256sum -c pascode_0.1.0_amd64.deb.sha256` from the artifact directory before
