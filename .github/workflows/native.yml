@@ -77,6 +77,10 @@ jobs:
         run: |
           cat build/native-assets/SHA256SUMS-* > build/native-assets/SHA256SUMS
           sh tests/install-native.sh build/native-assets
+      - name: Linux release engine import
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sh tests/native-engine-smoke.sh build/native-assets
       - name: PowerShell installer acceptance
         if: runner.os == 'Windows'
         shell: pwsh
