@@ -33,8 +33,14 @@ runtime pin file and PATH shim are backed up under
 No local package installation step remains. The user subsequently requested an
 update feed hosted by the P as code GitHub repository. Signed Release metadata,
 public key/client configuration, explicit release publisher and isolated APT
-acceptance/tamper/download tests are implemented. Local tests passed. GitHub
-publication/live-feed validation and the user's one-time sudo APT configuration
-are in progress. No existing login credentials or deployment state changed.
+acceptance/tamper/download tests are implemented. Local tests passed. Release
+`v0.1.0` is public at `https://github.com/tarskisworld/pascode/releases/tag/v0.1.0`.
+An isolated APT client accepted the live GitHub index and downloaded a byte-identical
+87.2 MB package through the latest-release redirects. The user's one-time sudo
+APT configuration remains pending; system APT settings were not changed by the
+test. Temporary signing files were removed after gopass recovery verification.
+No existing login credentials or deployment state changed.
 Selective ControlPlane integration remains separate; do not commit its unrelated
 changes. See [APT repository governance and setup](apt-repository.md).
+
+Source review: https://github.com/tarskisworld/pascode/pull/1 (not merged).

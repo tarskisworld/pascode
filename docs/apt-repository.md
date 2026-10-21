@@ -52,6 +52,10 @@ them only in a private temporary directory when publishing, and remove that
 directory afterwards. Do not export a signing key into an ordinary worker or a
 pull-request job. No GitHub Actions signing secret or unattended publisher is
 configured by this initial setup.
+The generated revocation certificate is separately encrypted at
+`pascode/apt/revocation-certificate`. Recovery of all three entries was verified
+without displaying their contents. Use full multiline output when recovering
+the private key or certificate; gopass password-only output returns only one line.
 
 For each new version: build/test its package, download prior .deb assets from the
 current stable release into a private staging directory, add the new package,
