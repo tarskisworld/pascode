@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+task_install=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source "$task_install/runtime.env"
+export PASCODE_IMAGE
+task_command=${1:-}
+if (($#)); then shift; fi
+case "$task_command" in
+  pascodectl) task_entry=$PASCODE_CLI ;;
+  prompt-tests) task_entry=$PASCODE_PROMPT_CLI ;;
+  jira-analysis) task_entry=$PASCODE_ANALYSIS_CLI ;;
+  *) echo 'Unknown installed P as code command' >&2; exit 2 ;;
+esac
+exec bash "$task_entry" "$@"

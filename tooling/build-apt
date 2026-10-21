@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Build a signed flat APT archive suitable for GitHub Release assets.
+set -euo pipefail
+task_packages=${1:?Usage: build-apt PACKAGE_DIRECTORY OUTPUT_DIRECTORY SIGNING_FINGERPRINT PASSPHRASE_FILE}
+task_output=${2:?Supply a new output directory}
+task_fingerprint=${3:?Supply the signing fingerprint}
+task_passphrase=${4:?Supply a private passphrase file}
+task_signing_home=${PASCODE_SIGNING_HOME:?Set the isolated signing-key directory}
+[[ "$task_fingerprint" =~ ^[A-F0-9]{40}$ && -f "$task_passphrase" ]] || { echo 'Invalid signing inputs' >&2; exit 2; }
+[[ ! -e "$task_output" ]] || { echo 'Output must be new' >&2; exit 2; }
+mkdir -p -- "$task_output"
+task_output=$(realpath -- "$task_output")
+shopt -s nullglob
+task_files=("$task_packages"/*.deb)
+task_architectures=()
+[[ ${#task_files[@]} -gt 0 ]] || { echo 'No Debian packages found' >&2; exit 2; }
+for task_deb in "${task_files[@]}"; do
+  [[ $(dpkg-deb --field "$task_deb" Package) == pascode ]] || { echo 'Only pascode packages may enter this feed' >&2; exit 2; }
+  [[ $(basename -- "$task_deb") =~ ^pascode_[0-9A-Za-z.+~-]+_(amd64|arm64)\.deb$ ]] || { echo 'Unexpected package filename' >&2; exit 2; }
+  task_architectures+=("$(dpkg-deb --field "$task_deb" Architecture)")
+  install -m 0644 "$task_deb" "$task_output/"
+done
+(cd "$task_output" && dpkg-scanpackages --multiversion . /dev/null > Packages)
+gzip -n -c "$task_output/Packages" > "$task_output/Packages.gz"
+{
+  printf 'Origin: pascode\nLabel: P as code\nSuite: ./\nCodename: ./\n'
+  printf 'Date: %s\n' "$(LC_ALL=C date -u -R)"
+  printf 'Architectures: %s\nDescription: P as code signed update feed\nSHA256:\n' "$(printf '%s\n' "${task_architectures[@]}" | sort -u | paste -sd ' ')"
+  for task_name in Packages Packages.gz; do
+    task_hash=$(sha256sum "$task_output/$task_name" | cut -d' ' -f1)
+    printf ' %s %s %s\n' "$task_hash" "$(stat -c %s "$task_output/$task_name")" "$task_name"
+  done
+} > "$task_output/Release"
+task_gpg=(gpg --homedir "$task_signing_home" --batch --yes --pinentry-mode loopback --passphrase-file "$task_passphrase" --local-user "$task_fingerprint" --digest-algo SHA256)
+"${task_gpg[@]}" --clearsign --output "$task_output/InRelease" "$task_output/Release"
+"${task_gpg[@]}" --armor --detach-sign --output "$task_output/Release.gpg" "$task_output/Release"
+gpg --homedir "$task_signing_home" --batch --export "$task_fingerprint" > "$task_output/pascode-archive-keyring.gpg"
+printf '%s\n' "$task_fingerprint" > "$task_output/pascode-archive-keyring.fingerprint"
+cat > "$task_output/pascode.sources" <<'EOF'
+Types: deb
+URIs: https://github.com/tarskisworld/pascode/releases/latest/download/
+Suites: ./
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/pascode.gpg
+EOF
+printf 'Signed APT archive built in %s\n' "$task_output"
