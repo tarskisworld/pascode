@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +29,22 @@ func TestMain(m *testing.M) {
 		}
 		if len(args) > 0 && args[0] == "info" {
 			os.Stdout.WriteString("linux\n")
+		}
+		if state := os.Getenv("PASCODE_TEST_SETUP_STATE"); state != "" {
+			if len(args) > 1 && args[0] == "image" && args[1] == "inspect" {
+				if len(args) > 2 && args[2] == "--format" {
+					os.Stdout.WriteString("linux/amd64\n")
+				} else if _, e := os.Stat(state); os.IsNotExist(e) {
+					os.Exit(1)
+				}
+			}
+			if len(args) > 2 && args[0] == "load" && args[1] == "--input" {
+				if _, e := os.ReadFile(args[2]); e != nil {
+					os.Exit(2)
+				}
+				_ = os.WriteFile(state, []byte(args[2]), 0600)
+				os.Stdout.WriteString("Loaded image ID: " + testImage + "\n")
+			}
 		}
 		if len(args) > 0 && args[0] == "run" && os.Getenv("PASCODE_TEST_CANCEL") == "1" {
 			for i, s := range args {
@@ -215,6 +233,30 @@ func TestEnvironmentRedaction(t *testing.T) {
 	s := strings.Join(env, "\n")
 	if strings.Contains(s, "DEBUG") || strings.Contains(s, "old") || strings.Contains(s, "other") || strings.Contains(s, "secret") || !strings.Contains(s, "selected") || !strings.Contains(s, "PATH=keep") {
 		t.Fatal("incorrect environment filtering")
+	}
+}
+func TestSetupLoadsVerifiedCopy(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive.tar")
+	data := []byte("engine archive fixture")
+	if e := os.WriteFile(archive, data, 0600); e != nil {
+		t.Fatal(e)
+	}
+	state := filepath.Join(root, "load-state")
+	t.Setenv("PASCODE_FAKE_DOCKER", "1")
+	t.Setenv("PASCODE_TEST_SETUP_STATE", state)
+	t.Setenv("PASCODE_HOME", filepath.Join(root, "home"))
+	var out bytes.Buffer
+	a := app{ctx: context.Background(), out: &out, err: &out, docker: os.Args[0], config: config{Schema: 1, Image: testImage, Platform: "linux/amd64", Archive: archive, SHA256: fmt.Sprintf("%x", sha256.Sum256(data))}}
+	if e := a.setup(); e != nil {
+		t.Fatal(e)
+	}
+	loadedPath, e := os.ReadFile(state)
+	if e != nil || string(loadedPath) == archive {
+		t.Fatalf("Docker did not load a verified private copy: %q %v", loadedPath, e)
+	}
+	if _, e := os.Stat(string(loadedPath)); !os.IsNotExist(e) {
+		t.Fatalf("verified staging file was retained: %v", e)
 	}
 }
 func TestPrivateStateRejectsGit(t *testing.T) {

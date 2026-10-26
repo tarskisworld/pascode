@@ -98,3 +98,6 @@ revised locally. Native Go tests and vet pass. These edits are not yet part of
 the published prerelease; the remaining review findings, including installer
 bootstrap trust, Docker cancellation, Windows ACL handling and native Docker
 Desktop validation, remain open before a further preview or task closure.
+Engine setup now loads a private copy of the checked archive and checks the
+platform of a preexisting image; a focused native test verifies staging and
+cleanup. Native Go tests and vet pass after that follow-up.

@@ -100,16 +100,28 @@ func (a app) setup() error {
 		if e != nil {
 			return e
 		}
+		defer f.Close()
+		staged, e := os.CreateTemp("", "pascode-engine-*.tar")
+		if e != nil {
+			return e
+		}
+		stagedPath := staged.Name()
+		defer os.Remove(stagedPath)
 		h := sha256.New()
-		_, e = io.Copy(h, f)
-		f.Close()
+		_, e = io.Copy(io.MultiWriter(staged, h), f)
+		if e == nil {
+			e = staged.Sync()
+		}
+		if closeErr := staged.Close(); e == nil {
+			e = closeErr
+		}
 		if e != nil {
 			return e
 		}
 		if hex.EncodeToString(h.Sum(nil)) != a.config.SHA256 {
 			return fmt.Errorf("engine archive checksum mismatch")
 		}
-		loaded, loadErr := a.capture(a.docker, "load", "--input", a.config.Archive)
+		loaded, loadErr := a.capture(a.docker, "load", "--input", stagedPath)
 		if loadErr != nil {
 			return fmt.Errorf("failed to load verified engine archive: %w", loadErr)
 		}
@@ -123,10 +135,13 @@ func (a app) setup() error {
 			}
 			a.config.Image = match[1]
 		}
-		actual, e := a.capture(a.docker, "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", a.config.Image)
-		if e != nil || actual != a.config.Platform {
-			return fmt.Errorf("loaded image platform does not match the release")
-		}
+	}
+	actual, e := a.capture(a.docker, "image", "inspect", "--format", "{{.Os}}/{{.Architecture}}", a.config.Image)
+	if e != nil {
+		return fmt.Errorf("unable to inspect engine platform: %w", e)
+	}
+	if actual != a.config.Platform {
+		return fmt.Errorf("engine image platform %q does not match configured %q", actual, a.config.Platform)
 	}
 	home, e := homeDir()
 	if e != nil {
