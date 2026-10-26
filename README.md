@@ -1,22 +1,33 @@
-# P as code software
+# P as code
 
-Container-backed configuration tooling with a shared CLI, per-project declarations
-and a signed APT update feed. Current release: **0.1.0**.
+P as code helps teams validate and manage Jira configuration from files. Keep a
+project's declarations in its own repository, check them locally, generate mapping
+and bindings, and review a plan before applying changes to Jira. The command runs
+its Python and Terraform engine in a pinned Linux container, so a normal install
+does not require a source checkout or those tools on your host.
 
-**Stable distribution:** Debian/Ubuntu amd64, including Ubuntu under WSL, with a
-working Docker daemon. A separate native preview provides Linux, macOS and Windows
-installers for x86-64 and ARM64. See [native distribution status](docs/portability.md)
-for what has been tested on each platform.
+P as code currently supports the declaration dialects and Jira resources covered
+by its existing adapters. It does not create a new project structure for you, and
+it does not turn every Jira setting into a managed resource.
 
-## Install on Debian or Ubuntu
+## Choose an installation
 
-Currently supported package architecture: **amd64**, including Ubuntu on WSL.
-Have Docker installed and running, your user authorized to access it, and `curl`
-and CA certificates available. No source checkout or personal home path is needed.
+| Platform | Release | Status |
+| --- | --- | --- |
+| Debian or Ubuntu on x86-64, including WSL | 0.1.0 via signed APT repository | Stable distribution |
+| Linux, macOS or Windows on x86-64 or ARM64 | 0.2.0-rc.2 native installer | Preview |
 
-Run this block in **Bash**. It downloads the public key, verifies its pinned
-SHA-256, adds the scoped repository, installs the package and configures your user.
-The parentheses keep shell settings and temporary variables out of your shell.
+Both routes need Docker with an accessible **Linux-container daemon** for setup
+and engine commands. Your user must be able to use Docker. Installation does not
+change Docker permissions or install Docker for you. The native preview has passed
+installer and CLI checks on all six OS/CPU combinations; engine setup has been
+verified on Linux x86-64 and ARM64. Docker Desktop engine execution on native
+macOS and Windows is still being validated.
+
+### Debian or Ubuntu: stable APT release
+
+Run this block in Bash. It checks the repository signing key before configuring a
+source restricted to the `pascode` package. You do not need to clone this repo.
 
 ```bash
 (
@@ -46,137 +57,82 @@ The parentheses keep shell settings and temporary variables out of your shell.
   sudo apt update
   sudo apt install pascode
   /usr/bin/pascodectl setup
-  hash -r
-  /usr/bin/pascodectl version
   /usr/bin/pascodectl doctor
 )
-hash -r
 ```
 
-Use sudo only for system installation and APT configuration; run setup as your
-ordinary user. Re-running the block refreshes only the pascode-owned key/source/
-preference files and package setup. For a checkout-based helper that refuses
-differing existing APT files, see [APT setup](docs/apt-repository.md).
+The `sudo` steps configure APT and install the package. Run `setup` as your
+ordinary user. Later upgrades use normal APT commands; run `pascodectl setup`
+after an upgrade to adopt its engine for your user. See the [APT repository
+notes](docs/apt-repository.md) for key management, rollback and removal.
 
-## Native preview without a source checkout
-
-Preview `0.2.0-rc.2` installs per user on Linux, macOS or Windows. It needs a
-working Docker Linux-container daemon for `setup` and engine commands; the host
-command itself needs no Go, Python, Terraform or source checkout. On Linux/macOS,
-run in a terminal:
+### Linux or macOS: native preview
 
 ```sh
 curl -fsSL https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.sh | sh
 "$HOME/.local/bin/pascodectl" doctor
 ```
 
-On Windows, run in PowerShell:
+The installer selects your CPU, verifies the downloaded package and engine against
+the release checksums, and installs under `~/.pascode`. If Docker is not ready yet,
+run `"$HOME/.local/bin/pascodectl" setup` after starting a Linux-container daemon.
+The installer prints PATH guidance if `~/.local/bin` is not already on your PATH.
+
+### Windows: native preview
+
+Run in PowerShell:
 
 ```powershell
 irm 'https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.ps1' | iex
 & "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
 ```
 
-The installer selects the CPU architecture, checks the downloaded package and
-engine hashes against the release manifest, and runs setup when Docker is
-available. If Docker is installed later, run the installed command's `setup`,
-then `doctor`. The Unix installer prints PATH guidance when `~/.local/bin` is not
-already on PATH; Windows adds its per-user bin directory to future terminals.
-Use the full command path shown above in the current terminal when needed.
-Re-running the versioned installer verifies and reuses the installed version.
+The installer adds its command directory to your user PATH for future terminals.
+If Docker Desktop is not ready, run `setup` with the installed command after
+starting Docker in Linux-container mode. The executable is currently unsigned,
+so Windows may show a publisher warning. The macOS preview is not notarized.
+These preview installers verify downloaded assets with SHA-256; that check does
+not establish a verified software publisher.
 
-This is a preview. Linux runners on both architectures have imported the engine
-and passed setup/doctor. Native installer and CLI checks passed on both macOS and
-Windows architectures, but Docker Desktop execution there remains unverified.
-The Windows executable is unsigned and can show a publisher warning; macOS
-artifacts are not notarized. The signed Debian APT feed continues to use stable
-`0.1.0` and is unaffected by this prerelease.
+## Use an existing declaration project
 
-## Upgrade
+Check the installation, then point the command at the root of a supported
+P as code declaration project:
 
-```bash
-sudo apt update
-sudo apt install --only-upgrade pascode
-/usr/bin/pascodectl setup
-pascodectl doctor
-```
-
-Normal `sudo apt upgrade` also upgrades the package. Setup deliberately adopts the
-new engine for the current user; package installation does not silently repin
-every user's runtime. See [release notes](CHANGELOG.md) and
-[key governance and rollback](docs/apt-repository.md).
-
-## Use
-
-```bash
+```sh
 pascodectl version
-pascodectl --help
 pascodectl doctor
-pascodectl validate --project /path/to/project/.pascode
+pascodectl validate --project /path/to/declarations
+pascodectl map --project /path/to/declarations --output /path/to/output
+pascodectl bindings --project /path/to/declarations --output /path/to/output
 ```
 
-Without an explicit project path, commands search the current directory and its
-ancestors for `.pascode/jira-as-code` or `jira-as-code`. Existing schemas must use
-a supported declaration dialect; there is no project-scaffolding command yet.
-Validate/map are offline. Live plan/apply/verify require explicit state, bindings
-and selected target authentication.
+`validate`, `map` and `bindings` run offline, without contacting Jira. If you run
+a command inside a project, P as code also searches the current directory and its
+parents for `.pascode/jira-as-code` or `jira-as-code` declarations. Use
+`pascodectl --help` for commands and options.
 
-System files live under `/usr/bin` and `/usr/lib/pascode`. User configuration is
-`$HOME/.pascode` (equivalently `~/.pascode`); it is not a cache and is not under
-`$XDG_CACHE_HOME`. The command uses `PASCODE_HOME` only when you explicitly select
-another user configuration root. No HOME environment setting needs to be changed.
-Project declarations and private deployment state remain separately owned.
+`plan`, `apply` and `verify` are separate live operations. They require explicit
+bindings, a private state directory outside Git, and credentials for the selected
+Jira target. Review the plan before applying it. Keep credentials and deployment
+state with the owning project, outside this software repository and its images.
 
-## Development and architecture
+The shared user configuration lives in `~/.pascode`; it is persistent configuration,
+not a cache. Native installers keep versions there for explicit upgrades and
+rollback. See [native distribution status](docs/portability.md) for tested behavior
+and remaining platform work.
 
-Reusable validation, Jira shape mapping, binding generation, deployment and audit
-code extracted from ControlPlane. This independent local repository is the `pascode` software source owned by
-`tarskisworld`. It does not replace any instance declaration repository. No GitHub
-repository was created, and no source was pushed during extraction.
+## Development and project status
 
-The Dockerfile pins Python, locked Python dependencies and Terraform 1.14.4 by
-digest. It contains no declarations, credentials, state, naming database or Docker
-socket. `bin/pascodectl` is the host launcher; set `PASCODE_IMAGE` to the immutable
-image ID/digest. Normal commands run packaged code, with no source bind mount.
-An explicit development build can be made with `docker build --iidfile IMAGE_ID .`.
-The environment integration installs the launcher by content hash and pins the image.
+This repository contains the reusable CLI, engine, validation, mapping, bindings,
+deployment and audit code. Project declarations and target-specific evidence live
+in independent repositories. The [package and CLI contract](docs/debian-package.md)
+explains the stable package; the [changelog](CHANGELOG.md) records stable releases.
+The [native launcher pull request](https://github.com/tarskisworld/pascode/pull/2)
+and [preview release](https://github.com/tarskisworld/pascode/releases/tag/v0.2.0-rc.2)
+show the current cross-platform work. No live Jira deployment is implied by
+installing the CLI.
 
-The shared user installation now lives in `~/.pascode`, independently of the
-ControlPlane source checkout. See [local installation](docs/local-installation.md)
-for installation, layout, compatibility paths and recovery boundaries.
-
-The CLI is versioned from `VERSION` using semantic versioning. `pascodectl version`
-and `pascodectl --help` work without starting Docker. An offline Debian package
-provides the standard `/usr/bin/pascodectl` installation; see the
-[package and CLI contract](docs/debian-package.md) for setup, feature coverage,
-upgrades and the previous-launcher handoff.
-
-The [signed APT feed](docs/apt-repository.md) is hosted using this repository's
-GitHub Release assets. One-time client configuration scopes its public signing
-key and permits only the pascode package from the feed. Package upgrades use
-standard APT; adopting an upgraded engine remains explicit per-user setup.
-
-Commands retain validate/map/bindings/plan/apply/verify and positional arguments.
-Offline work is networkless. Deployment Python and Terraform jobs receive only
-selected credentials/bindings and the private work directory. Host locking still
-protects that directory. Terraform is containerized by default; an explicit
-`PASCODE_TERRAFORM_BINARY` retains the existing host-binary compatibility contract.
-State must remain outside Git. No automatic reconciliation is introduced.
-
-The read-only MCP deliberately retains the existing BRB/CDT target interface.
-Environment configuration supplies their mounts. MainSystem uses JSON text valid
-as YAML with JSON schemas; BRB/CDT use their existing YAML schema dialect. Packaging
-does not make those dialects execution-compatible or resolve missing schemas.
-
-Existing tests: `/app/tests.py`, `/app/mcp_tests.py`, `/runtime/tests.py`,
-`/runtime/adapter_tests.py`, `/runtime/deployment_tests.py`. Execution tests consume
-an explicit declaration fixture mounted read-only at `/inputs`. They make no live
-Jira calls. `worker.py` CLI uses `--root` and `--schema-root`; `runner.py` implements
-offline validate/map. Persistent state and historical instance evidence remain
-with their owning environment/declaration repositories.
-
-`legacy-jira/` centralizes six existing YAML-dialect mapping/analysis/generation
-implementations previously copied across CDT and BRB. Instance scripts are now
-compatibility wrappers; site/account labels and historical samples remain instance
-inputs. See `legacy-jira/README.md` and its extraction audit. `bin/jira-analysis`
-runs those commands in the pinned offline image with explicit input/output mounts.
+Report problems or request features in the [ControlPlane issue tracker](https://github.com/cloisterdorateura/ControlPlane/issues),
+which tracks this project's work. This repository does not currently include a
+license file.
