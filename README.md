@@ -1,4 +1,4 @@
-# P as code software
+# P as code
 
 Reusable validation, Jira shape mapping, binding generation, deployment and audit
 code extracted from ControlPlane. This independent local repository is the `pascode` software source owned by
