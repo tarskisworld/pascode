@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,8 @@ import (
 const testImage = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 func TestMain(m *testing.M) {
-	if os.Getenv("PASCODE_FAKE_DOCKER") == "1" {
+	if os.Getenv("PASCODE_FAKE_DOCKER") == "1" && len(os.Args) > 1 &&
+		(os.Args[1] == "info" || os.Args[1] == "run" || os.Args[1] == "rm" || os.Args[1] == "image" || os.Args[1] == "load") {
 		args := os.Args[1:]
 		b, _ := json.Marshal(args)
 		if f := os.Getenv("PASCODE_TEST_LOG"); f != "" {
@@ -39,13 +41,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 func TestParseAndMetadata(t *testing.T) {
-	for _, args := range [][]string{{"version", "--json"}, {"--version"}, {"help", "validate"}, {"validate", "--project=a path", "--json"}, {"map", "a path", "output", "bindings"}} {
+	for _, args := range [][]string{{"version", "--json"}, {"--version"}, {"apply", "--version"}, {"help", "validate"}, {"validate", "--project=a path", "--json"}, {"map", "a path", "output", "bindings"}} {
 		o, e := parse(args)
 		if e != nil {
 			t.Fatal(e)
 		}
 		if args[0] == "validate" && o.project != "a path" {
 			t.Fatal(o)
+		}
+		if len(args) == 2 && args[0] == "apply" && !o.showVersion {
+			t.Fatal("global version flag did not short-circuit apply")
 		}
 	}
 	for _, args := range [][]string{{"--bad"}, {"wat"}, {"validate", "--project"}, {"--project", "a", "--project", "b", "validate"}} {
@@ -96,7 +101,7 @@ func TestProjectDiscoveryAndExplicitPrecedence(t *testing.T) {
 func TestConfigurationNeverExecutesShell(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("PASCODE_HOME", home)
-	payload := "PASCODE_IMAGE=" + testImage + "\necho unsafe > marker\n"
+	payload := "PASCODE_IMAGE=" + testImage + "\r\necho unsafe > \"$PASCODE_HOME/marker\"\n"
 	os.WriteFile(filepath.Join(home, "runtime.env"), []byte(payload), 0600)
 	c, e := loadConfig(false)
 	if e != nil || c.Image != testImage {
@@ -206,9 +211,9 @@ func TestCancelledOwnedContainerRemoved(t *testing.T) {
 	}
 }
 func TestEnvironmentRedaction(t *testing.T) {
-	env := cleanEnvironment([]string{"TF_LOG=DEBUG", "TF_CLI_ARGS_apply=-lock=false", "TF_WORKSPACE=other", "JIRA_API_TOKEN=old", "PATH=keep"}, map[string]string{"JIRA_API_TOKEN": "selected"})
+	env := cleanEnvironment([]string{"TF_LOG=DEBUG", "TF_CLI_ARGS_apply=-lock=false", "TF_WORKSPACE=other", "TF_VAR_unrelated=secret", "JIRA_API_TOKEN=old", "PATH=keep"}, map[string]string{"JIRA_API_TOKEN": "selected"})
 	s := strings.Join(env, "\n")
-	if strings.Contains(s, "DEBUG") || strings.Contains(s, "old") || strings.Contains(s, "other") || !strings.Contains(s, "selected") || !strings.Contains(s, "PATH=keep") {
+	if strings.Contains(s, "DEBUG") || strings.Contains(s, "old") || strings.Contains(s, "other") || strings.Contains(s, "secret") || !strings.Contains(s, "selected") || !strings.Contains(s, "PATH=keep") {
 		t.Fatal("incorrect environment filtering")
 	}
 }
@@ -224,5 +229,47 @@ func TestPrivateStateRejectsGit(t *testing.T) {
 	var u usageError
 	if !errors.As(e, &u) {
 		t.Fatal(e)
+	}
+}
+func TestExistingDeploymentStateIsRestricted(t *testing.T) {
+	root := t.TempDir()
+	state := filepath.Join(root, "state")
+	if e := os.Mkdir(state, 0755); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(state, ".pascodectl-workspace"), nil, 0600); e != nil {
+		t.Fatal(e)
+	}
+	bindings := filepath.Join(root, "bindings.json")
+	if e := os.WriteFile(bindings, []byte("{}"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	a := app{ctx: context.Background()}
+	_ = a.deployment(options{command: "plan", state: state, bindings: bindings}, root)
+	if runtime.GOOS != "windows" {
+		if info, e := os.Stat(state); e != nil || info.Mode().Perm() != 0700 {
+			t.Fatalf("state directory remains accessible: %v %v", info, e)
+		}
+	}
+}
+func TestUnreadablePlatformMarkerFailsClosed(t *testing.T) {
+	root := t.TempDir()
+	state := filepath.Join(root, "state")
+	if e := os.Mkdir(state, 0700); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.WriteFile(filepath.Join(state, ".pascodectl-workspace"), nil, 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := os.Mkdir(filepath.Join(state, ".pascodectl-platform"), 0700); e != nil {
+		t.Fatal(e)
+	}
+	bindings := filepath.Join(root, "bindings.json")
+	if e := os.WriteFile(bindings, []byte("{}"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	a := app{ctx: context.Background()}
+	if e := a.deployment(options{command: "plan", state: state, bindings: bindings}, root); e == nil || !strings.Contains(e.Error(), "platform marker") {
+		t.Fatalf("unreadable marker was accepted: %v", e)
 	}
 }

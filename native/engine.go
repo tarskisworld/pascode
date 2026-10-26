@@ -148,6 +148,9 @@ func (a app) setup() error {
 	if e = f.Chmod(0600); e == nil {
 		_, e = f.Write(append(b, '\n'))
 	}
+	if e == nil {
+		e = f.Sync()
+	}
 	if closeErr := f.Close(); e == nil {
 		e = closeErr
 	}
@@ -270,7 +273,8 @@ func (a app) deployment(o options, project string) error {
 		return usage("deployment state must be outside Git repositories")
 	}
 	marker := filepath.Join(state, ".pascodectl-workspace")
-	if _, e = os.Stat(marker); os.IsNotExist(e) {
+	markerInfo, markerErr := os.Lstat(marker)
+	if os.IsNotExist(markerErr) {
 		entries, e := os.ReadDir(state)
 		if e != nil {
 			return e
@@ -284,6 +288,13 @@ func (a app) deployment(o options, project string) error {
 		if e = os.WriteFile(marker, []byte{}, 0600); e != nil {
 			return e
 		}
+	} else if markerErr != nil {
+		return markerErr
+	} else if !markerInfo.Mode().IsRegular() {
+		return usage("deployment workspace marker must be a regular file")
+	}
+	if e = secureDirectory(state); e != nil {
+		return e
 	}
 	unlock, e := lockWorkspace(filepath.Join(state, ".pipeline.lock"))
 	if e != nil {
@@ -291,12 +302,17 @@ func (a app) deployment(o options, project string) error {
 	}
 	defer unlock()
 	platformMarker := filepath.Join(state, ".pascodectl-platform")
-	if b, e := os.ReadFile(platformMarker); e == nil && strings.TrimSpace(string(b)) != runtime.GOOS {
-		return usage("do not share deployment state between host operating systems")
-	}
-	if _, e = os.Stat(platformMarker); os.IsNotExist(e) {
+	platformData, platformErr := os.ReadFile(platformMarker)
+	if platformErr == nil {
+		if strings.TrimSpace(string(platformData)) != runtime.GOOS {
+			return usage("do not share deployment state between host operating systems")
+		}
+	} else if os.IsNotExist(platformErr) {
 		if runtime.GOOS != "linux" {
-			entries, _ := os.ReadDir(state)
+			entries, readErr := os.ReadDir(state)
+			if readErr != nil {
+				return readErr
+			}
 			if len(entries) > 2 {
 				return usage("existing legacy state requires a separately reviewed platform migration")
 			}
@@ -304,6 +320,8 @@ func (a app) deployment(o options, project string) error {
 		if e = os.WriteFile(platformMarker, []byte(runtime.GOOS+"\n"), 0600); e != nil {
 			return e
 		}
+	} else {
+		return fmt.Errorf("unable to read deployment platform marker: %w", platformErr)
 	}
 	mode := os.Getenv("PASCODE_AUTH_MODE")
 	if mode != "api_token_bootstrap" && mode != "api_service_account_override" {
@@ -367,15 +385,22 @@ func (a app) deployment(o options, project string) error {
 }
 func cleanEnvironment(env []string, extra map[string]string) []string {
 	result := []string{}
+	allowed := map[string]bool{
+		"PATH": true, "HOME": true, "USERPROFILE": true, "HOMEDRIVE": true,
+		"HOMEPATH": true, "SYSTEMROOT": true, "WINDIR": true, "COMSPEC": true,
+		"TMP": true, "TEMP": true, "TMPDIR": true, "LANG": true, "LC_ALL": true,
+		"XDG_RUNTIME_DIR": true, "SSL_CERT_FILE": true, "SSL_CERT_DIR": true,
+		"DOCKER_HOST": true, "DOCKER_CONTEXT": true, "DOCKER_CONFIG": true,
+		"DOCKER_CERT_PATH": true, "DOCKER_TLS_VERIFY": true,
+	}
 	for _, entry := range env {
 		key := strings.SplitN(entry, "=", 2)[0]
 		if _, ok := extra[key]; ok {
 			continue
 		}
-		if key == "JIRA_API_KEY" || key == "JIRA_DEFAULT_PROJECT_LEAD_ACCOUNT_ID" || strings.HasPrefix(key, "TF_LOG") || strings.HasPrefix(key, "TF_CLI_ARGS") || key == "TF_DATA_DIR" || key == "TF_WORKSPACE" {
-			continue
+		if allowed[strings.ToUpper(key)] {
+			result = append(result, entry)
 		}
-		result = append(result, entry)
 	}
 	for k, v := range extra {
 		result = append(result, k+"="+v)

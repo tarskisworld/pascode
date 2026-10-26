@@ -1,5 +1,10 @@
 # Portable distribution requirements
 
+P as code is intended to manage software configuration through APIs across
+services. Jira is the first implemented adapter, not the product boundary.
+Installing the CLI does not confer support for a service without an adapter and
+declaration schema.
+
 The user requires installation by another person on another machine, rather than
 commands specialized for the development workstation. This document records the
 implemented native preview and the remaining acceptance criteria. Version 0.1.0
@@ -12,8 +17,9 @@ Version 0.1.0 provides a Debian amd64 package and signed APT feed, validated on
 Ubuntu under WSL. Its public installation commands contain no developer paths.
 It still requires a running, accessible Docker daemon, Bash and GNU host utilities.
 The host launchers use `flock`, `realpath`, `sha256sum` and Unix user IDs. Therefore
-the current launcher is not a native Windows or macOS distribution, and the
-container alone does not supply host portability. No arm64 release is published.
+the stable launcher is not a native Windows or macOS distribution, and the
+container alone does not supply host portability. The separate 0.2.0-rc.2
+prerelease has Linux arm64 artifacts.
 
 ## Supported-platform target
 
@@ -41,7 +47,7 @@ The public repository should provide:
 - A Unix installer and a PowerShell installer that detect OS/architecture, select
   matching SHA-256-checked artifacts, install outside the source checkout, and
   expose the command without assuming developer paths. Both scripts are implemented
-  for a preview release; publication and clean-machine checks remain.
+  for a published prerelease; native Docker Desktop checks remain.
 - Actionable dependency diagnostics and explicit container-runtime setup guidance.
   Installing a privileged daemon or changing group membership is not implicit.
 - Non-admin per-user installation where feasible; package-manager integration for

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -19,7 +20,7 @@ var version = "0.2.0-dev"
 
 type options struct {
 	command, project, output, bindings, state string
-	json, help                                bool
+	json, help, showVersion                   bool
 	args                                      []string
 }
 type app struct {
@@ -57,7 +58,7 @@ func parse(args []string) (o options, err error) {
 		case "--help", "-h":
 			o.help = true
 		case "--version", "-V":
-			o.args = append(o.args, "version")
+			o.showVersion = true
 		case "--project", "-C", "--output", "-o", "--bindings", "--state-dir":
 			if i+1 == len(args) || args[i+1] == "" {
 				return o, usage("option needs a value")
@@ -84,6 +85,11 @@ func parse(args []string) (o options, err error) {
 			}
 			o.args = append(o.args, s)
 		}
+	}
+	if o.showVersion {
+		o.command = "version"
+		o.args = nil
+		return o, nil
 	}
 	o.command = "help"
 	if len(o.args) > 0 {
@@ -155,7 +161,7 @@ func loadConfig(preferRelease bool) (config, error) {
 	if b, e := os.ReadFile(filepath.Join(home, "runtime.env")); e == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			if strings.HasPrefix(line, "PASCODE_IMAGE=") {
-				c = config{Schema: 1, Image: strings.Trim(strings.TrimPrefix(line, "PASCODE_IMAGE="), "\"'"), Platform: "linux/amd64"}
+				c = config{Schema: 1, Image: strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "PASCODE_IMAGE=")), "\"'"), Platform: "linux/amd64"}
 				return c, validateConfig(c)
 			}
 		}
@@ -202,6 +208,13 @@ func (a app) capture(name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(b)), e
 }
 func (a app) execute(o options) error {
+	if o.showVersion {
+		if o.json {
+			return json.NewEncoder(a.out).Encode(map[string]string{"name": "pascodectl", "version": version})
+		}
+		fmt.Fprintln(a.out, "pascodectl", version)
+		return nil
+	}
 	if o.help {
 		fmt.Fprint(a.out, helpText)
 		return nil
@@ -287,7 +300,7 @@ Docker must run Linux containers. No host Bash, Python, Terraform or Go is neede
 `
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	o, e := parse(os.Args[1:])
 	a := app{ctx: ctx, out: os.Stdout, err: os.Stderr, docker: "docker"}

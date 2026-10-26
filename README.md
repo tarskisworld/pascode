@@ -1,14 +1,17 @@
 # P as code
 
-P as code helps teams validate and manage Jira configuration from files. Keep a
-project's declarations in its own repository, check them locally, generate mapping
-and bindings, and review a plan before applying changes to Jira. The command runs
-its Python and Terraform engine in a pinned Linux container, so a normal install
-does not require a source checkout or those tools on your host.
+P as code is for managing software configuration through APIs using declarations
+in files. The goal is to support any software with an API. Keep each project's
+declarations in its own repository, check them locally, and review a plan before
+applying changes. The command runs its Python and Terraform engine in a pinned
+Linux container, so a normal install does not require a source checkout or those
+tools on your host.
 
-P as code currently supports the declaration dialects and Jira resources covered
-by its existing adapters. It does not create a new project structure for you, and
-it does not turn every Jira setting into a managed resource.
+**Current implementation:** the available validation, mapping, bindings and
+deployment adapters focus on Jira. Support for another service requires adapters
+for its API and declaration schema; installing the CLI alone does not add that
+support. The current Jira adapters do not cover every Jira setting, and the CLI
+does not create a new declaration project structure for you.
 
 ## Choose an installation
 
@@ -107,7 +110,7 @@ pascodectl map --project /path/to/declarations --output /path/to/output
 pascodectl bindings --project /path/to/declarations --output /path/to/output
 ```
 
-`validate`, `map` and `bindings` run offline, without contacting Jira. If you run
+`validate`, `map` and `bindings` run offline, without contacting the target API. If you run
 a command inside a project, P as code also searches the current directory and its
 parents for `.pascode/jira-as-code` or `jira-as-code` declarations. Use
 `pascodectl --help` for commands and options.

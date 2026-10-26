@@ -3,7 +3,12 @@ set -euo pipefail
 task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 task_image=golang@sha256:5c3e9b43cfd3bb95c7937462e29d87ada57b481a96fa23ad0eb61778d7a00110
 mkdir -p "$task_root/build/go-cache"
+task_mounts=(-v "$task_root:/workspace:ro" -v "$task_root/build:/workspace/build:rw")
+# Formatting intentionally edits source; opt in to the broader development mount.
+if [[ ${PASCODE_NATIVE_WRITE:-0} == 1 ]]; then
+  task_mounts=(-v "$task_root:/workspace:rw")
+fi
 exec docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
   --user "$(id -u):$(id -g)" --tmpfs /tmp:rw,exec,nosuid,nodev \
   -e GOCACHE=/workspace/build/go-cache -e GOPATH=/tmp/go-path -e GOTOOLCHAIN=local \
-  -v "$task_root:/workspace" -w /workspace/native "$task_image" "$@"
+  "${task_mounts[@]}" -w /workspace/native "$task_image" "$@"

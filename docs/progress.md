@@ -86,3 +86,15 @@ clone-free installation commands. Preview 1 stays withdrawn. Remaining acceptanc
 Docker Desktop execution on native macOS/Windows, publisher signing/notarization,
 and tested minimum OS/runtime versions. Do not close the corresponding tasks yet.
 No live Jira apply was run.
+
+## Current follow-up — 2026-10-26
+
+The public README and portability guide now distinguish the project's intended
+scope (software with APIs) from its implemented Jira adapters. The portable CLI
+review is in progress: global version reporting, CRLF legacy pins, deployment
+state permissions and marker errors, selected host environment forwarding,
+configuration durability, and a read-only default development mount were
+revised locally. Native Go tests and vet pass. These edits are not yet part of
+the published prerelease; the remaining review findings, including installer
+bootstrap trust, Docker cancellation, Windows ACL handling and native Docker
+Desktop validation, remain open before a further preview or task closure.
