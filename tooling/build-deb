@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Build a self-contained offline engine package. No image pull or live apply.
+set -euo pipefail
+task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+task_image=${1:?Usage: build-deb IMMUTABLE_IMAGE [OUTPUT_DIRECTORY]}
+task_output=${2:-$task_root/build}
+task_version=$(cat "$task_root/VERSION")
+task_commit=$(git -C "$task_root" rev-parse HEAD)
+[[ -z $(git -C "$task_root" status --porcelain) ]] || { echo 'Build release packages from a clean source checkout' >&2; exit 2; }
+[[ "$task_version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo 'VERSION must be a stable semantic version' >&2; exit 2; }
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || { echo 'Engine image must be immutable' >&2; exit 2; }
+task_arch=$(docker image inspect "$task_image" --format '{{.Architecture}}')
+task_os=$(docker image inspect "$task_image" --format '{{.Os}}')
+task_image_id=$(docker image inspect "$task_image" --format '{{.Id}}')
+[[ "$task_image_id" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Docker did not return an immutable image ID' >&2; exit 2; }
+[[ "$task_os" == linux ]] || { echo 'The Debian package requires a Linux engine' >&2; exit 2; }
+case "$task_arch" in amd64|arm64) ;; *) echo 'Unsupported engine architecture' >&2; exit 2 ;; esac
+mkdir -p -- "$task_output"
+task_output=$(realpath -- "$task_output")
+task_stage=$(mktemp -d)
+trap 'rm -rf -- "$task_stage"' EXIT
+task_lib="$task_stage/usr/lib/pascode"
+mkdir -p "$task_stage/DEBIAN" "$task_stage/usr/bin" "$task_lib/bin" \
+  "$task_stage/usr/share/doc/pascode" "$task_stage/usr/share/bash-completion/completions"
+for task_file in cli pascodectl prompt-tests jira-analysis runtime-command install-local; do
+  install -m 0755 "$task_root/bin/$task_file" "$task_lib/bin/$task_file"
+done
+install -m 0644 "$task_root/VERSION" "$task_lib/VERSION"
+printf 'PASCODE_IMAGE=%q\n' "$task_image_id" > "$task_lib/engine.env"
+cat > "$task_stage/usr/bin/pascodectl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+task_prefix=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+exec bash "$task_prefix/lib/pascode/bin/cli" "$@"
+EOF
+chmod 0755 "$task_stage/usr/bin/pascodectl"
+bash "$task_root/bin/cli" completion bash > "$task_stage/usr/share/bash-completion/completions/pascodectl"
+install -m 0644 "$task_root/docs/debian-package.md" "$task_stage/usr/share/doc/pascode/README.md"
+printf 'pascode (%s) local; urgency=medium\n\n  * Initial offline container-backed CLI package.\n\n -- P as code maintainers <noreply@localhost>  Tue, 20 Oct 2026 12:00:00 -0400\n' "$task_version" | gzip -n > "$task_stage/usr/share/doc/pascode/changelog.Debian.gz"
+# Explicitly requested packaging may access the host Docker CLI, never its socket
+# inside a worker. The archive contains engine software only, not runtime mounts.
+docker save "$task_image_id" | gzip -n > "$task_lib/engine.tar.gz"
+task_size=$(du -sk "$task_stage/usr" | cut -f1)
+cat > "$task_stage/DEBIAN/control" <<EOF
+Package: pascode
+Version: $task_version
+Architecture: $task_arch
+X-Source-Commit: $task_commit
+Maintainer: P as code maintainers <noreply@localhost>
+Section: admin
+Priority: optional
+Depends: bash (>= 4.4), coreutils, util-linux, git, docker.io | docker-ce-cli | moby-cli
+Installed-Size: $task_size
+Description: Container-backed declarative configuration CLI
+ Shared P as code launchers and an offline immutable execution image.
+ Per-user setup is explicit; installation performs no live provisioning.
+EOF
+task_artifact="$task_output/pascode_${task_version}_${task_arch}.deb"
+[[ ! -e "$task_artifact" && ! -e "$task_artifact.sha256" ]] || { echo 'Refusing to overwrite existing versioned package bytes' >&2; exit 2; }
+dpkg-deb --root-owner-group -Zgzip -z1 --build "$task_stage" "$task_artifact"
+(cd "$task_output" && sha256sum "$(basename -- "$task_artifact")" > "$(basename -- "$task_artifact").sha256")
+printf 'Built %s\n' "$task_artifact"

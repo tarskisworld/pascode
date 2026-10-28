@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Install only this repository's reviewed public key and scoped APT settings.
+set -euo pipefail
+task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+task_public="$task_root/packaging/apt"
+[[ $(id -u) == 0 ]] || { echo 'Run with sudo in your terminal' >&2; exit 2; }
+task_tmp=$(mktemp -d)
+trap 'rm -rf -- "$task_tmp"' EXIT
+command -v gpg >/dev/null || { echo 'Install gnupg before configuring the APT feed' >&2; exit 2; }
+task_expected=$(cat "$task_public/pascode-archive-keyring.fingerprint")
+task_observed=$(gpg --homedir "$task_tmp" --batch --with-colons --show-keys "$task_public/pascode-archive-keyring.gpg" | awk -F: '$1=="pub" {primary=1;next} $1=="fpr" && primary {print $10;primary=0}')
+[[ "$task_expected" =~ ^[A-F0-9]{40}$ && "$task_observed" == "$task_expected" ]] || { echo 'Public keyring must contain exactly the reviewed primary key' >&2; exit 2; }
+task_arch=$(dpkg --print-architecture)
+[[ "$task_arch" == amd64 ]] || { echo 'This initial feed currently publishes amd64 only' >&2; exit 2; }
+cat > "$task_tmp/pascode.sources" <<'EOF'
+Types: deb
+URIs: https://github.com/tarskisworld/pascode/releases/latest/download/
+Suites: ./
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/pascode.gpg
+EOF
+cat > "$task_tmp/pascode.pref" <<'EOF'
+Package: pascode
+Pin: release o=pascode
+Pin-Priority: 500
+
+Package: *
+Pin: release o=pascode
+Pin-Priority: -1
+EOF
+task_destinations=(/etc/apt/keyrings/pascode.gpg /etc/apt/sources.list.d/pascode.sources /etc/apt/preferences.d/pascode)
+task_sources=("$task_public/pascode-archive-keyring.gpg" "$task_tmp/pascode.sources" "$task_tmp/pascode.pref")
+for task_index in 0 1 2; do
+  task_destination=${task_destinations[$task_index]}
+  if [[ -e "$task_destination" ]]; then
+    cmp "${task_sources[$task_index]}" "$task_destination" || { echo 'Existing APT configuration differs; review before replacing' >&2; exit 2; }
+  fi
+done
+install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d
+for task_index in 0 1 2; do
+  install -m 0644 "${task_sources[$task_index]}" "${task_destinations[$task_index]}"
+done
+printf 'Configured the signed P as code feed. Run sudo apt update.\n'

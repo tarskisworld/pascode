@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+# Public host interface. Domain execution remains in the pinned container.
+set -euo pipefail
+task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+task_home=${PASCODE_HOME:-$HOME/.pascode}
+if [[ -z ${PASCODE_HOME:-} && -f "$task_root/runtime.env" ]]; then task_home=$task_root; fi
+task_version=$(cat "$task_root/VERSION")
+task_json=false
+task_project=''
+task_output=''
+task_bindings=''
+task_state=''
+task_help=false
+task_args=()
+task_fail() {
+  if $task_json; then printf '{"error":"usage","message":"%s"}\n' "$1" >&2
+  else printf 'pascodectl: %s\nTry: pascodectl help\n' "$1" >&2; fi
+  exit 2
+}
+task_usage() {
+  cat <<'EOF'
+Usage: pascodectl [OPTIONS] COMMAND [PROJECT_ROOT] [OUTPUT_OR_STATE] [BINDINGS]
+
+Commands:
+  validate     Validate supported declarations offline
+  map          Generate execution, Terraform and REST mappings offline
+  bindings     Generate target binding placeholders offline
+  plan         Inspect a live target and preview deployment
+  apply        Apply changes to the explicitly selected target
+  verify       Read back and verify a live target
+  version      Print the CLI semantic version; supports --json
+  doctor       Check host dependencies and the pinned local image
+  setup        Load the packaged image and configure this user's installation
+  completion   Print Bash completion: pascodectl completion bash
+  help         Show help, optionally for a command
+
+Options:
+  -h, --help              Show help without starting Docker
+  -V, --version           Print the CLI semantic version
+  --json                  JSON output for version, doctor, validate and map
+  -C, --project PATH      Select declarations explicitly
+  -o, --output PATH       Output directory for map or bindings
+  --bindings FILE         Existing target bindings for map/plan/apply/verify
+  --state-dir PATH        Private state directory for plan/apply/verify
+
+Without PROJECT_ROOT, search this directory and its ancestors for
+.pascode/jira-as-code or jira-as-code. Explicit paths take precedence.
+Legacy positional commands remain supported. No command applies implicitly.
+Exit codes: 0 success, 1 failed check, 2 usage; execution errors retain engine codes.
+EOF
+}
+while (($#)); do
+  case "$1" in
+    --json) task_json=true; shift ;;
+    -h|--help) task_help=true; shift ;;
+    -V|--version) task_args+=(version); shift ;;
+    --project=*|--output=*|--bindings=*|--state-dir=*)
+      set -- "${1%%=*}" "${1#*=}" "${@:2}" ;;
+    -C|--project|-o|--output|--bindings|--state-dir)
+      [[ $# -ge 2 && -n "$2" ]] || task_fail 'An option is missing its value'
+      case "$1" in
+        -C|--project) [[ -z "$task_project" ]] || task_fail 'Project specified twice'; task_project=$2 ;;
+        -o|--output) [[ -z "$task_output" ]] || task_fail 'Output specified twice'; task_output=$2 ;;
+        --bindings) [[ -z "$task_bindings" ]] || task_fail 'Bindings specified twice'; task_bindings=$2 ;;
+        --state-dir) [[ -z "$task_state" ]] || task_fail 'State directory specified twice'; task_state=$2 ;;
+      esac
+      shift 2 ;;
+    --) shift; task_args+=("$@"); break ;;
+    -*) task_fail 'Unknown option' ;;
+    *) task_args+=("$1"); shift ;;
+  esac
+done
+set -- "${task_args[@]}"
+task_command=${1:-help}
+if (($#)); then shift; fi
+if [[ "$task_command" == help ]]; then
+  [[ $# -le 1 ]] || task_fail 'Help accepts one command'
+  task_command=${1:-help}; set --; task_help=true
+fi
+case "$task_command" in validate|map|bindings|plan|apply|verify|version|doctor|setup|completion|help) ;; *) task_fail 'Unknown command' ;; esac
+if $task_help; then
+  if [[ "$task_command" != help ]]; then printf 'Help for %s\n\n' "$task_command"; fi
+  task_usage; exit 0
+fi
+if [[ "$task_command" == version ]]; then
+  [[ $# == 0 && -z "$task_project$task_output$task_bindings$task_state" ]] || task_fail 'Version accepts no paths'
+  if $task_json; then printf '{"name":"pascodectl","version":"%s"}\n' "$task_version"
+  else printf 'pascodectl %s\n' "$task_version"; fi
+  exit 0
+fi
+if [[ "$task_command" == completion ]]; then
+  [[ $# == 1 && "$1" == bash ]] || task_fail 'Use: pascodectl completion bash'
+  [[ -z "$task_project$task_output$task_bindings$task_state" ]] || task_fail 'Completion accepts no project paths'
+  $task_json && task_fail 'Completion does not support JSON'
+  cat <<'EOF'
+_pascodectl_complete() {
+  local current="${COMP_WORDS[COMP_CWORD]}"
+  if [[ $COMP_CWORD == 1 ]]; then
+    COMPREPLY=($(compgen -W 'validate map bindings plan apply verify version doctor setup completion help --help --version --json --project --output --bindings --state-dir' -- "$current"))
+  else
+    mapfile -t COMPREPLY < <(compgen -f -- "$current")
+  fi
+}
+complete -F _pascodectl_complete pascodectl
+EOF
+  exit 0
+fi
+if [[ -f "$task_home/runtime.env" ]]; then
+  source "$task_home/runtime.env"
+elif [[ -f "$task_root/engine.env" ]]; then
+  source "$task_root/engine.env"
+fi
+task_image=${PASCODE_IMAGE:-}
+if [[ "$task_command" == doctor ]]; then
+  [[ $# == 0 && -z "$task_project$task_output$task_bindings$task_state" ]] || task_fail 'Doctor accepts no paths'
+  task_tools_ok=true
+  for task_tool in docker git flock realpath sha256sum; do
+    command -v "$task_tool" >/dev/null || task_tools_ok=false
+  done
+  task_docker_ok=false
+  if command -v docker >/dev/null && docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then task_docker_ok=true; fi
+  task_image_ok=false
+  if [[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]]; then
+    if docker image inspect "$task_image" >/dev/null 2>&1; then task_image_ok=true; fi
+  fi
+  task_ok=false
+  if $task_tools_ok && $task_docker_ok && $task_image_ok; then task_ok=true; fi
+  if $task_json; then printf '{"ready":%s,"checks":{"host_tools":%s,"docker_access":%s,"pinned_local_image":%s}}\n' "$task_ok" "$task_tools_ok" "$task_docker_ok" "$task_image_ok"
+  elif $task_ok; then printf 'Ready: host tools, Docker access and pinned local image\n'
+  else printf 'Not ready: host tools=%s, Docker access=%s, pinned local image=%s\n' "$task_tools_ok" "$task_docker_ok" "$task_image_ok" >&2; fi
+  $task_ok && exit 0; exit 1
+fi
+if [[ "$task_command" == setup ]]; then
+  [[ $# == 0 && -z "$task_project$task_output$task_bindings$task_state" ]] || task_fail 'Setup accepts no paths'
+  $task_json && task_fail 'Setup does not support JSON'
+  if [[ ! -f "$task_root/engine.env" || ! -f "$task_root/bin/install-local" ]]; then
+    if [[ -f /usr/lib/pascode/bin/cli ]]; then exec bash /usr/lib/pascode/bin/cli setup; fi
+    task_fail 'Setup requires the Debian package; source installs use bin/install-local'
+  fi
+  source "$task_root/engine.env"
+  if ! docker image inspect "$PASCODE_IMAGE" >/dev/null 2>&1; then
+    [[ -f "$task_root/engine.tar.gz" ]] || task_fail 'Packaged engine archive is missing'
+    docker load --input "$task_root/engine.tar.gz"
+  fi
+  PASCODE_INSTALL_PATH_COMMAND=0 bash "$task_root/bin/install-local" "$PASCODE_IMAGE" "$task_home"
+  # Retire only the exact launcher created by our earlier local installer.
+  task_old="${PASCODE_USER_BIN_DIR:-$HOME/.local/bin}/pascodectl"
+  task_expected=$(printf '#!/usr/bin/env bash\nset -euo pipefail\nexec bash %q "$@"\n' "$task_home/bin/pascodectl")
+  if [[ -f "$task_old" && ! -L "$task_old" && $(cat "$task_old") == "$task_expected" ]]; then
+    mkdir -p "$task_home/migrations/package-setup"
+    if [[ -e "$task_home/migrations/package-setup/pascodectl" ]]; then
+      cmp "$task_old" "$task_home/migrations/package-setup/pascodectl" >/dev/null || task_fail 'Launcher backup already exists with different content'
+      rm -- "$task_old"
+    else mv -- "$task_old" "$task_home/migrations/package-setup/pascodectl"; fi
+    printf 'Backed up the previous user PATH launcher; use the packaged system command\n'
+  fi
+  exit 0
+fi
+case "$task_command" in validate|map) ;; *) $task_json && task_fail 'JSON is supported for version, doctor, validate and map' ;; esac
+if [[ -z "$task_project" && $# -gt 0 ]]; then task_project=$1; shift; fi
+if [[ -z "$task_project" ]]; then
+  task_search=$PWD
+  while :; do
+    if [[ -d "$task_search/.pascode/jira-as-code" ]]; then task_project="$task_search/.pascode"; break; fi
+    if [[ -d "$task_search/jira-as-code" ]]; then task_project=$task_search; break; fi
+    [[ "$task_search" != / ]] || break
+    task_search=$(dirname -- "$task_search")
+  done
+fi
+[[ -n "$task_project" ]] || task_fail 'No project found; use --project PATH'
+if [[ -d "$task_project/.pascode/jira-as-code" && ! -d "$task_project/jira-as-code" ]]; then task_project="$task_project/.pascode"; fi
+[[ -d "$task_project/jira-as-code" ]] || task_fail 'Project must contain jira-as-code'
+case "$task_command" in
+  validate) [[ $# == 0 && -z "$task_output$task_bindings$task_state" ]] || task_fail 'Validate accepts only a project path'; task_forward=(validate "$task_project") ;;
+  map|bindings)
+    [[ -z "$task_state" ]] || task_fail 'Offline commands do not accept a state directory'
+    if [[ -z "$task_output" && $# -gt 0 ]]; then task_output=$1; shift; fi
+    if [[ "$task_command" == map && -z "$task_bindings" && $# -gt 0 ]]; then task_bindings=$1; shift; fi
+    [[ $# == 0 ]] || task_fail 'Too many positional arguments'
+    [[ "$task_command" != bindings || ( -n "$task_output" && -z "$task_bindings" ) ]] || task_fail 'Bindings requires an output directory'
+    [[ -z "$task_bindings" || -n "$task_output" ]] || task_fail 'Mapping bindings require an output directory'
+    task_forward=("$task_command" "$task_project")
+    [[ -z "$task_output" ]] || task_forward+=("$task_output")
+    [[ -z "$task_bindings" ]] || task_forward+=("$task_bindings") ;;
+  plan|apply|verify)
+    [[ -z "$task_output" ]] || task_fail 'Deployment requires --state-dir rather than --output'
+    if [[ -z "$task_state" && $# -gt 0 ]]; then task_state=$1; shift; fi
+    if [[ -z "$task_bindings" && $# -gt 0 ]]; then task_bindings=$1; shift; fi
+    [[ $# == 0 && -n "$task_state" && -n "$task_bindings" ]] || task_fail 'Deployment requires a private state directory and bindings file'
+    task_forward=("$task_command" "$task_project" "$task_state" "$task_bindings") ;;
+esac
+[[ "$task_image" =~ ^sha256:[a-f0-9]{64}$ || "$task_image" =~ @sha256:[a-f0-9]{64}$ ]] || task_fail 'No immutable engine configured; run setup or install-local'
+export PASCODE_IMAGE="$task_image"
+task_entry=${PASCODE_CLI:-$task_root/bin/pascodectl}
+exec bash "$task_entry" "${task_forward[@]}"
