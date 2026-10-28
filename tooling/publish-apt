@@ -47,6 +47,10 @@ if [[ "$task_existing" == true ]]; then
   task_target=$(gh api "repos/$task_repo/releases/tags/$task_tag" --jq .target_commitish)
   [[ "$task_target" == "$task_commit" ]] || { echo 'Draft release points at another source commit' >&2; exit 2; }
   gh release view "$task_tag" --repo "$task_repo" --json assets --jq '.assets[].name' > "$task_tmp/draft-assets"
+  for task_asset in "${task_assets[@]}"; do basename -- "$task_asset"; done > "$task_tmp/expected-assets"
+  while IFS= read -r task_name; do
+    rg -Fxq "$task_name" "$task_tmp/expected-assets" || { echo "Draft contains an unexpected asset: $task_name" >&2; exit 2; }
+  done < "$task_tmp/draft-assets"
   for task_asset in "${task_assets[@]}"; do
     task_name=$(basename -- "$task_asset")
     if rg -Fxq "$task_name" "$task_tmp/draft-assets"; then
