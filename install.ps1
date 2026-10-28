@@ -57,17 +57,20 @@ try {
     if ((Get-FileHash -Algorithm SHA256 -LiteralPath $command).Hash -ne $previous.sha256) { throw 'Existing command was modified; refusing to overwrite it' }
   }
   $pendingCommand = Join-Path $BinDir ('.pascodectl-' + [Guid]::NewGuid().ToString('N') + '.exe')
-  Copy-Item -LiteralPath (Join-Path $destination 'pascodectl.exe') -Destination $pendingCommand
-  if (Test-Path -LiteralPath $command) {
-    $backupCommand = Join-Path $BinDir ('.pascodectl-backup-' + [Guid]::NewGuid().ToString('N') + '.exe')
-    [IO.File]::Replace($pendingCommand,$command,$backupCommand)
-    Remove-Item -LiteralPath $backupCommand -Force
-  }
-  else { [IO.File]::Move($pendingCommand,$command) }
+  try {
+    Copy-Item -LiteralPath (Join-Path $destination 'pascodectl.exe') -Destination $pendingCommand
+    if (Test-Path -LiteralPath $command) {
+      $backupCommand = Join-Path $BinDir ('.pascodectl-backup-' + [Guid]::NewGuid().ToString('N') + '.exe')
+      [IO.File]::Replace($pendingCommand,$command,$backupCommand)
+      Remove-Item -LiteralPath $backupCommand -Force
+    }
+    else { [IO.File]::Move($pendingCommand,$command) }
+  } finally { if (Test-Path -LiteralPath $pendingCommand) { Remove-Item -LiteralPath $pendingCommand -Force } }
+  @{sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $command).Hash;version=$Version} | ConvertTo-Json | Set-Content -LiteralPath $record -Encoding UTF8
+  [IO.File]::WriteAllText((Join-Path $BinDir '.pascode-home'),($InstallRoot + [Environment]::NewLine),[Text.UTF8Encoding]::new($false))
   $config = Get-Content -Raw -LiteralPath (Join-Path $destination 'engine.json') | ConvertFrom-Json
   $config.archive = Join-Path $destination $engine
   [IO.File]::WriteAllText((Join-Path $BinDir 'engine.json'),($config | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
-  @{sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $command).Hash;version=$Version} | ConvertTo-Json | Set-Content -LiteralPath $record -Encoding UTF8
   if (-not $NoPathUpdate) {
     $userPath = [Environment]::GetEnvironmentVariable('Path','User')
     if ($null -eq $userPath) { $userPath = '' }
@@ -76,7 +79,7 @@ try {
   }
   & $command version
   if ($LASTEXITCODE -ne 0) { throw 'Installed CLI could not start' }
-  if (-not $SkipSetup -and (Get-Command docker -ErrorAction SilentlyContinue)) { & $command setup; if ($LASTEXITCODE -ne 0) { throw 'CLI installed; start a Linux-container daemon and run setup' } }
+  if (-not $SkipSetup -and (Get-Command docker -ErrorAction SilentlyContinue) -and ((docker info --format '{{.OSType}}' 2>$null) -eq 'linux')) { & $command setup; if ($LASTEXITCODE -ne 0) { throw 'CLI installed; setup failed, inspect Docker and retry setup' } }
   else { Write-Host "CLI installed. Start a Linux container runtime, then run: `"$command`" setup" }
   Write-Host "Installed Windows/$arch release $Version without changing project declarations or credentials."
 } finally { if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force } }

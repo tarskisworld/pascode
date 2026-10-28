@@ -37,6 +37,17 @@ func hash(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), e
 }
 func copyFile(source, target string) error {
+	sourceAbs, e := filepath.Abs(source)
+	if e != nil {
+		return e
+	}
+	targetAbs, e := filepath.Abs(target)
+	if e != nil {
+		return e
+	}
+	if sourceAbs == targetAbs {
+		return fmt.Errorf("engine source and destination must differ")
+	}
 	f, e := os.Open(source)
 	if e != nil {
 		return e
@@ -132,9 +143,11 @@ func build() error {
 		if e != nil {
 			return e
 		}
-		fmt.Fprintf(manifest, "%s  %s\n", sum, name)
+		if _, e = fmt.Fprintf(manifest, "%s  %s\n", sum, name); e != nil {
+			return e
+		}
 	}
-	return nil
+	return manifest.Sync()
 }
 
 type member struct {

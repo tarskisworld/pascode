@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -121,10 +122,13 @@ func (a app) setup() error {
 		if hex.EncodeToString(h.Sum(nil)) != a.config.SHA256 {
 			return fmt.Errorf("engine archive checksum mismatch")
 		}
-		loaded, loadErr := a.capture(a.docker, "load", "--input", stagedPath)
+		loadCommand := exec.CommandContext(a.ctx, a.docker, "load", "--input", stagedPath)
+		loadCommand.Stderr = a.err
+		loadOutput, loadErr := loadCommand.Output()
 		if loadErr != nil {
 			return fmt.Errorf("failed to load verified engine archive: %w", loadErr)
 		}
+		loaded := strings.TrimSpace(string(loadOutput))
 		if _, e = a.capture(a.docker, "image", "inspect", a.config.Image); e != nil {
 			// Some Docker versions rewrite image metadata while importing an
 			// archive, changing its local ID. The checked archive still pins

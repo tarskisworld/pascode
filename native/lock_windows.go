@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"syscall"
 	"unsafe"
 )
@@ -30,13 +29,25 @@ func lockWorkspace(path string) (func(), error) {
 	return func() { unlockFile.Call(f.Fd(), 0, 1, 0, uintptr(unsafe.Pointer(over))); f.Close() }, nil
 }
 func secureDirectory(path string) error {
-	u, e := user.Current()
-	if e != nil {
-		return e
-	}
-	cmd := exec.Command("icacls", path, "/inheritance:r", "/grant:r", "*"+u.Uid+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F")
-	if e = cmd.Run(); e != nil {
-		return fmt.Errorf("unable to restrict state-directory ACL: %w", e)
+	// Set the complete DACL in one operation. icacls /grant:r would leave
+	// unrelated explicit grants from an existing workspace in place.
+	const script = `$path = $env:PASCODE_STATE_DIR
+$acl = Get-Acl -LiteralPath $path
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($rule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($rule) }
+$inherit = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'
+$propagate = [System.Security.AccessControl.PropagationFlags]::None
+$allow = [System.Security.AccessControl.AccessControlType]::Allow
+$full = [System.Security.AccessControl.FileSystemRights]::FullControl
+$userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$systemSid = [System.Security.Principal.SecurityIdentifier]'S-1-5-18'
+$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($userSid,$full,$inherit,$propagate,$allow))
+$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($systemSid,$full,$inherit,$propagate,$allow))
+Set-Acl -LiteralPath $path -AclObject $acl`
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	cmd.Env = append(os.Environ(), "PASCODE_STATE_DIR="+path)
+	if output, e := cmd.CombinedOutput(); e != nil {
+		return fmt.Errorf("unable to restrict state-directory ACL: %w: %s", e, output)
 	}
 	return nil
 }

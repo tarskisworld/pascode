@@ -21,7 +21,7 @@ const testImage = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 func TestMain(m *testing.M) {
 	if os.Getenv("PASCODE_FAKE_DOCKER") == "1" && len(os.Args) > 1 &&
-		(os.Args[1] == "info" || os.Args[1] == "run" || os.Args[1] == "rm" || os.Args[1] == "image" || os.Args[1] == "load") {
+		(os.Args[1] == "info" || os.Args[1] == "run" || os.Args[1] == "rm" || os.Args[1] == "ps" || os.Args[1] == "image" || os.Args[1] == "load") {
 		args := os.Args[1:]
 		b, _ := json.Marshal(args)
 		if f := os.Getenv("PASCODE_TEST_LOG"); f != "" {
@@ -47,12 +47,17 @@ func TestMain(m *testing.M) {
 			}
 		}
 		if len(args) > 0 && args[0] == "run" && os.Getenv("PASCODE_TEST_CANCEL") == "1" {
-			for i, s := range args {
-				if s == "--cidfile" && i+1 < len(args) {
-					os.WriteFile(args[i+1], []byte(strings.Repeat("a", 64)), 0600)
+			if os.Getenv("PASCODE_TEST_CANCEL_NO_CID") != "1" {
+				for i, s := range args {
+					if s == "--cidfile" && i+1 < len(args) {
+						os.WriteFile(args[i+1], []byte(strings.Repeat("a", 64)), 0600)
+					}
 				}
 			}
 			time.Sleep(30 * time.Second)
+		}
+		if len(args) > 0 && args[0] == "ps" && os.Getenv("PASCODE_TEST_CANCEL_NO_CID") == "1" {
+			os.Stdout.WriteString(strings.Repeat("a", 64) + "\n")
 		}
 		os.Exit(0)
 	}
@@ -228,6 +233,35 @@ func TestCancelledOwnedContainerRemoved(t *testing.T) {
 		t.Fatal("owned container not removed", string(b))
 	}
 }
+func TestCancelledContainerBeforeCIDFileIsRemoved(t *testing.T) {
+	t.Setenv("PASCODE_FAKE_DOCKER", "1")
+	t.Setenv("PASCODE_TEST_CANCEL", "1")
+	t.Setenv("PASCODE_TEST_CANCEL_NO_CID", "1")
+	log := filepath.Join(t.TempDir(), "args")
+	t.Setenv("PASCODE_TEST_LOG", log)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var out bytes.Buffer
+	a := app{ctx: ctx, out: &out, err: &out, docker: os.Args[0]}
+	done := make(chan error, 1)
+	go func() { done <- a.run(a.docker, []string{"run", "--rm", testImage}, nil) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		b, _ := os.ReadFile(log)
+		if strings.Contains(string(b), `"run"`) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	if e := <-done; e == nil {
+		t.Fatal("cancellation succeeded")
+	}
+	b, _ := os.ReadFile(log)
+	if !strings.Contains(string(b), `"rm","--force"`) {
+		t.Fatal("owned container was not removed after missing CID file", string(b))
+	}
+}
 func TestEnvironmentRedaction(t *testing.T) {
 	env := cleanEnvironment([]string{"TF_LOG=DEBUG", "TF_CLI_ARGS_apply=-lock=false", "TF_WORKSPACE=other", "TF_VAR_unrelated=secret", "JIRA_API_TOKEN=old", "PATH=keep"}, map[string]string{"JIRA_API_TOKEN": "selected"})
 	s := strings.Join(env, "\n")
@@ -282,6 +316,11 @@ func TestExistingDeploymentStateIsRestricted(t *testing.T) {
 	if e := os.WriteFile(filepath.Join(state, ".pascodectl-workspace"), nil, 0600); e != nil {
 		t.Fatal(e)
 	}
+	if runtime.GOOS == "windows" {
+		if b, e := exec.Command("icacls", state, "/grant", "*S-1-1-0:(OI)(CI)R").CombinedOutput(); e != nil {
+			t.Fatalf("unable to seed extra ACL grant: %v %s", e, b)
+		}
+	}
 	bindings := filepath.Join(root, "bindings.json")
 	if e := os.WriteFile(bindings, []byte("{}"), 0600); e != nil {
 		t.Fatal(e)
@@ -291,6 +330,11 @@ func TestExistingDeploymentStateIsRestricted(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		if info, e := os.Stat(state); e != nil || info.Mode().Perm() != 0700 {
 			t.Fatalf("state directory remains accessible: %v %v", info, e)
+		}
+	} else {
+		b, e := exec.Command("icacls", state).CombinedOutput()
+		if e != nil || strings.Contains(string(b), "Everyone") || strings.Contains(string(b), "S-1-1-0") {
+			t.Fatalf("extra ACL grant remained: %v %s", e, b)
 		}
 	}
 }

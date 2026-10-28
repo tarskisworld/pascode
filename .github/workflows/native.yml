@@ -2,6 +2,7 @@ name: Native portability
 on:
   push:
     branches: [main, codex/portable-cli]
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   engine:
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +47,7 @@ jobs:
           path: build/native-assets/
           retention-days: 7
   native:
+    timeout-minutes: 30
     needs: engine
     strategy:
       fail-fast: false

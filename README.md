@@ -88,12 +88,33 @@ differing administrator-managed files.
 ### Linux or macOS: native preview
 
 ```sh
-curl -fsSL https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.sh | sh
+(
+  set -eu
+  pascode_stage=$(mktemp -d)
+  trap 'rm -r -- "$pascode_stage"' EXIT
+  pascode_base=https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2
+  for pascode_file in install.sh SHA256SUMS; do
+    curl -fsSL "$pascode_base/$pascode_file" -o "$pascode_stage/$pascode_file"
+  done
+  pascode_hash() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+    else shasum -a 256 "$1" | awk '{print $1}'; fi
+  }
+  [ "$(pascode_hash "$pascode_stage/install.sh")" = 63d56cf9f18481f07313822555b8d7895b26a53e20e84d7b14e59e502622e636 ]
+  [ "$(pascode_hash "$pascode_stage/SHA256SUMS")" = e4c5a12dceb1709cf9c86ebd0712f5a4de4c86ffcb9108139a255f21229282b3 ]
+  case "$(uname -s)" in Linux) pascode_os=linux ;; Darwin) pascode_os=darwin ;; *) exit 2 ;; esac
+  case "$(uname -m)" in x86_64|amd64) pascode_arch=amd64 ;; arm64|aarch64) pascode_arch=arm64 ;; *) exit 2 ;; esac
+  for pascode_file in "pascodectl_0.2.0-rc.2_${pascode_os}_${pascode_arch}.tar.gz" "engine_linux_${pascode_arch}.tar.gz"; do
+    curl -fsSL "$pascode_base/$pascode_file" -o "$pascode_stage/$pascode_file"
+  done
+  PASCODE_DOWNLOAD_DIR="$pascode_stage" sh "$pascode_stage/install.sh"
+)
 "$HOME/.local/bin/pascodectl" doctor
 ```
 
-The installer selects your CPU, verifies the downloaded package and engine against
-the release checksums, and installs under `~/.pascode`. If Docker is not ready yet,
+The fixed hashes above pin the installer and manifest for this preview; the
+installer verifies the platform package and engine against that manifest before
+installing under `~/.pascode`. If Docker is not ready yet,
 run `"$HOME/.local/bin/pascodectl" setup` after starting a Linux-container daemon.
 The installer prints PATH guidance if `~/.local/bin` is not already on your PATH.
 
@@ -102,7 +123,21 @@ The installer prints PATH guidance if `~/.local/bin` is not already on your PATH
 Run in PowerShell:
 
 ```powershell
-irm 'https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2/install.ps1' | iex
+$pascodeStage = Join-Path ([IO.Path]::GetTempPath()) ('pascode-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $pascodeStage | Out-Null
+try {
+  $pascodeBase = 'https://github.com/tarskisworld/pascode/releases/download/v0.2.0-rc.2'
+  foreach ($name in @('install.ps1','SHA256SUMS')) {
+    Invoke-WebRequest -UseBasicParsing -Uri "$pascodeBase/$name" -OutFile (Join-Path $pascodeStage $name)
+  }
+  if ((Get-FileHash -Algorithm SHA256 (Join-Path $pascodeStage 'install.ps1')).Hash -ine '2adce3729089c0adf663e9f3cc2ab007f2b094ea7dbb02a727ba283a89ef5f30') { throw 'Installer checksum mismatch' }
+  if ((Get-FileHash -Algorithm SHA256 (Join-Path $pascodeStage 'SHA256SUMS')).Hash -ine 'e4c5a12dceb1709cf9c86ebd0712f5a4de4c86ffcb9108139a255f21229282b3') { throw 'Manifest checksum mismatch' }
+  $pascodeArch = switch ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()) { 'x64' { 'amd64' } 'arm64' { 'arm64' } default { throw 'Unsupported CPU' } }
+  foreach ($name in @("pascodectl_0.2.0-rc.2_windows_$pascodeArch.zip", "engine_linux_$pascodeArch.tar.gz")) {
+    Invoke-WebRequest -UseBasicParsing -Uri "$pascodeBase/$name" -OutFile (Join-Path $pascodeStage $name)
+  }
+  & (Join-Path $pascodeStage 'install.ps1') -DownloadDirectory $pascodeStage
+} finally { Remove-Item -LiteralPath $pascodeStage -Recurse -Force }
 & "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
 ```
 

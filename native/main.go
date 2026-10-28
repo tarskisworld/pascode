@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -117,6 +119,23 @@ func homeDir() (string, error) {
 	if p := os.Getenv("PASCODE_HOME"); p != "" {
 		return filepath.Abs(p)
 	}
+	if exe, e := os.Executable(); e == nil {
+		locations := []string{filepath.Dir(exe)}
+		if resolved, resolveErr := filepath.EvalSymlinks(exe); resolveErr == nil && resolved != exe {
+			locations = append(locations, filepath.Dir(resolved))
+		}
+		for _, location := range locations {
+			if b, readErr := os.ReadFile(filepath.Join(location, ".pascode-home")); readErr == nil {
+				p := strings.TrimSpace(string(b))
+				if !filepath.IsAbs(p) {
+					return "", fmt.Errorf("invalid installed configuration path")
+				}
+				return filepath.Clean(p), nil
+			} else if !os.IsNotExist(readErr) {
+				return "", readErr
+			}
+		}
+	}
 	p, e := os.UserHomeDir()
 	return filepath.Join(p, ".pascode"), e
 }
@@ -170,6 +189,7 @@ func loadConfig(preferRelease bool) (config, error) {
 }
 func (a app) run(name string, args []string, env []string) error {
 	cidPath := ""
+	ownerLabel := ""
 	if name == a.docker && len(args) > 0 && args[0] == "run" {
 		dir, e := os.MkdirTemp("", "pascode-container-")
 		if e != nil {
@@ -177,7 +197,12 @@ func (a app) run(name string, args []string, env []string) error {
 		}
 		defer os.RemoveAll(dir)
 		cidPath = filepath.Join(dir, "cid")
-		args = append([]string{"run", "--cidfile", cidPath}, args[1:]...)
+		ownerBytes := make([]byte, 16)
+		if _, e = rand.Read(ownerBytes); e != nil {
+			return e
+		}
+		ownerLabel = "pascode.owner=" + hex.EncodeToString(ownerBytes)
+		args = append([]string{"run", "--cidfile", cidPath, "--label", ownerLabel}, args[1:]...)
 	}
 	cmd := exec.CommandContext(a.ctx, name, args...)
 	cmd.Stdout = a.out
@@ -188,14 +213,32 @@ func (a app) run(name string, args []string, env []string) error {
 	}
 	e := cmd.Run()
 	if a.ctx.Err() != nil && cidPath != "" {
+		ownedID := ""
 		if b, readErr := os.ReadFile(cidPath); readErr == nil {
 			cid := strings.TrimSpace(string(b))
 			if regexp.MustCompile(`^[a-f0-9]{64}$`).MatchString(cid) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if stopErr := exec.CommandContext(ctx, a.docker, "rm", "--force", cid).Run(); stopErr != nil {
-					return fmt.Errorf("cancelled; unable to stop the owned container: %w", stopErr)
+				ownedID = cid
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if ownedID == "" {
+			for ctx.Err() == nil {
+				query := exec.CommandContext(ctx, a.docker, "ps", "-aq", "--filter", "label="+ownerLabel)
+				found, queryErr := query.Output()
+				if queryErr != nil {
+					return fmt.Errorf("cancelled; unable to inspect owned containers: %w", queryErr)
 				}
+				if ids := strings.Fields(string(found)); len(ids) > 0 {
+					ownedID = ids[0]
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+		if ownedID != "" {
+			if stopErr := exec.CommandContext(ctx, a.docker, "rm", "--force", ownedID).Run(); stopErr != nil {
+				return fmt.Errorf("cancelled; unable to stop the owned container: %w", stopErr)
 			}
 		}
 	}

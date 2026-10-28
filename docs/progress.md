@@ -101,3 +101,14 @@ Desktop validation, remain open before a further preview or task closure.
 Engine setup now loads a private copy of the checked archive and checks the
 platform of a preexisting image; a focused native test verifies staging and
 cleanup. Native Go tests and vet pass after that follow-up.
+
+## Merge preparation — 2026-10-28
+
+The installation review fixes were committed on `codex/home-installation` and
+merged into the portable branch. A rebuilt Debian package passed package setup,
+upgrade handoff, archive loading, source-commit metadata, and overwrite refusal;
+the CLI and isolated APT tests passed. The portable branch now verifies the
+published preview installer and checksum manifest before execution in the public
+README. Local native tests cover cancellation before the Docker CID file exists;
+the pending CI run must validate Windows ACL behavior and both installers.
+No pull request has been merged and no new release has been published.

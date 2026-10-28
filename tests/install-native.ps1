@@ -11,6 +11,7 @@ try {
   & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -NoPathUpdate -SkipSetup
   & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -NoPathUpdate -SkipSetup
   $command = Join-Path $bin 'pascodectl.exe'
+  if ((Get-Content -Raw -LiteralPath (Join-Path $bin '.pascode-home')).Trim() -ne [IO.Path]::GetFullPath($env:PASCODE_HOME)) { throw 'Installed command lost its custom configuration root' }
   & $command version
   if ($LASTEXITCODE -ne 0) { throw 'Installed version command failed' }
   $help = & $command --help

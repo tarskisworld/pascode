@@ -11,7 +11,10 @@ mkdir -p "$root" "$bin"
 root=$(cd "$root" && pwd -P)
 bin=$(cd "$bin" && pwd -P)
 stage=$(mktemp -d "$root/.download.XXXXXX")
-trap 'rm -r -- "$stage"' EXIT HUP INT TERM
+trap 'rm -r -- "$stage"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 base="https://github.com/tarskisworld/pascode/releases/download/v$version"
 fetch() {
   if [ -n "${PASCODE_DOWNLOAD_DIR:-}" ]; then cp "$PASCODE_DOWNLOAD_DIR/$1" "$stage/$1"
@@ -49,20 +52,21 @@ mv "$stage/$engine" "$stage/package/$engine"
 chmod 755 "$stage/package/pascodectl"
 destination="$root/versions/$version/$system-$arch"
 mkdir -p "$(dirname "$destination")"
-if [ -e "$destination" ]; then
-  [ "$(hash_file "$destination/pascodectl")" = "$(hash_file "$stage/package/pascodectl")" ] && \
-    [ "$(hash_file "$destination/$engine")" = "$(hash_file "$stage/package/$engine")" ] && \
-    cmp "$destination/engine.json" "$stage/package/engine.json" >/dev/null || { echo 'Existing version differs; refusing to replace it' >&2; exit 1; }
-else mv "$stage/package" "$destination"; fi
 if [ -e "$bin/pascodectl" ] || [ -L "$bin/pascodectl" ]; then
   if [ ! -L "$bin/pascodectl" ]; then echo 'A custom command already exists; choose PASCODE_BIN_DIR' >&2; exit 1; fi
   target=$(readlink "$bin/pascodectl")
   case "$target" in "$root"/versions/*/pascodectl) ;; *) echo 'Existing command is not managed by this installer' >&2; exit 1 ;; esac
 fi
+if [ -e "$destination" ]; then
+  [ "$(hash_file "$destination/pascodectl")" = "$(hash_file "$stage/package/pascodectl")" ] && \
+    [ "$(hash_file "$destination/$engine")" = "$(hash_file "$stage/package/$engine")" ] && \
+    cmp "$destination/engine.json" "$stage/package/engine.json" >/dev/null || { echo 'Existing version differs; refusing to replace it' >&2; exit 1; }
+else mv "$stage/package" "$destination"; fi
+printf '%s\n' "$root" > "$destination/.pascode-home"
 ln -s "$destination/pascodectl" "$stage/pascodectl-link"
 mv -f "$stage/pascodectl-link" "$bin/pascodectl"
 "$bin/pascodectl" version
-if [ "${PASCODE_SKIP_SETUP:-0}" = 0 ] && command -v docker >/dev/null 2>&1; then
+if [ "${PASCODE_SKIP_SETUP:-0}" = 0 ] && command -v docker >/dev/null 2>&1 && docker info --format '{{.OSType}}' 2>/dev/null | grep -qx linux; then
   "$bin/pascodectl" setup
 else
   printf 'CLI installed. Start a Linux container runtime, then run: "%s/pascodectl" setup\n' "$bin"
