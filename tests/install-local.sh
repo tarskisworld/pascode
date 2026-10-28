@@ -20,6 +20,10 @@ cd "$task_tmp"
 test "$("$task_path/pascodectl" version)" = "pascodectl $(cat "$task_source/VERSION")"
 "$task_path/pascodectl" --help > "$task_tmp/usage"
 rg -q 'Usage: pascodectl' "$task_tmp/usage"
+if "$task_install/bin/prompt-tests" --invalid > "$task_tmp/dispatch-out" 2> "$task_tmp/dispatch-err"; then
+  echo 'Installed dispatcher unexpectedly accepted an invalid command' >&2; exit 1
+fi
+rg -q 'Usage: prompt-tests' "$task_tmp/dispatch-err"
 if bash "$task_source/bin/install-local" latest "$task_tmp/rejected" "$task_path" > "$task_tmp/rejected-output" 2>&1; then
   echo 'Mutable image unexpectedly accepted' >&2; exit 1
 else

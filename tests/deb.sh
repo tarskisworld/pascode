@@ -23,6 +23,7 @@ test ! -e "$PASCODE_USER_BIN_DIR/pascodectl"
 test -f "$PASCODE_HOME/migrations/package-setup/pascodectl"
 "$task_cli" setup
 "$task_cli" version --json > "$task_tmp/version"
+test "$(cat "$task_tmp/version")" = "$(printf '{"name":"pascodectl","version":"%s"}' "$(cat "$task_root/VERSION")")"
 "$task_cli" doctor --json > "$task_tmp/doctor"
 rg -q '"ready":true' "$task_tmp/doctor"
 # Custom launchers must never be retired by setup.

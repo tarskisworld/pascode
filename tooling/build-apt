@@ -25,6 +25,7 @@ gzip -n -c "$task_output/Packages" > "$task_output/Packages.gz"
 {
   printf 'Origin: pascode\nLabel: P as code\nSuite: ./\nCodename: ./\n'
   printf 'Date: %s\n' "$(LC_ALL=C date -u -R)"
+  printf 'Valid-Until: %s\n' "$(LC_ALL=C date -u -d '+1 year' -R)"
   printf 'Architectures: %s\nDescription: P as code signed update feed\nSHA256:\n' "$(printf '%s\n' "${task_architectures[@]}" | sort -u | paste -sd ' ')"
   for task_name in Packages Packages.gz; do
     task_hash=$(sha256sum "$task_output/$task_name" | cut -d' ' -f1)

@@ -14,7 +14,7 @@ bash bin/install-local IMMUTABLE_IMAGE_ID
 The image must already exist locally and be identified by its SHA-256 ID or a
 digest-pinned reference. Optional positional arguments select an installation root
 and a PATH command directory; defaults are `${PASCODE_HOME:-$HOME/.pascode}` and
-`$HOME/.local/bin`. The latter must already be on PATH. Installation updates the
+`${PASCODE_USER_BIN_DIR:-$HOME/.local/bin}`. The latter must already be on PATH. Installation updates the
 shared runtime for all its consumers, so run offline regression checks afterwards.
 There is no live apply, service restart or credential migration during installation.
 
@@ -48,8 +48,7 @@ declaration fixture to validate engine behavior after a shared pin change.
 
 For the existing machine migration, ControlPlane's `runtime.env` forwards to this
 shared file. Its instance launchers and validation Compose configuration remain
-environment-owned. The old `~/.local/share/pascode` directory is a compatibility
-symlink to `~/.pascode/packages`; it is not another installation. Historical records
-retain their original paths. Local migration backups allow restoring the old
-runtime file, PATH launcher and developer build wrapper before moving packages
-back to the old location.
+environment-owned. Any old `~/.local/share/pascode` compatibility symlink or
+migration backups must be created and preserved by the external migration process;
+`bin/install-local` does not create them. Historical records retain their original
+paths.

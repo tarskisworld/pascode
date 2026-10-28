@@ -2,18 +2,21 @@
 # Test APT without touching /etc, system lists, installed packages or credentials.
 set -euo pipefail
 task_feed=${1:?Supply the signed local feed directory}
+task_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 task_url=${2:-}
 task_tmp=$(mktemp -d)
 trap 'rm -rf -- "$task_tmp"' EXIT
 mkdir -p "$task_tmp/lists/partial" "$task_tmp/archives/partial" "$task_tmp/empty" "$task_tmp/download"
 cp -a --reflink=auto "$task_feed" "$task_tmp/repo"
 task_repo="$task_tmp/repo"
-task_key="$task_repo/pascode-archive-keyring.gpg"
+task_key="$task_root/packaging/apt/pascode-archive-keyring.gpg"
+cmp "$task_key" "$task_repo/pascode-archive-keyring.gpg"
 gpgv --keyring "$task_key" "$task_repo/InRelease"
 if [[ -z "$task_url" ]]; then task_url="file:$task_repo/"; task_tamper=true
 else task_tamper=false; fi
 printf 'deb [arch=amd64 signed-by=%s] %s ./\n' "$task_key" "$task_url" > "$task_tmp/sources.list"
 task_apt=(-o "Dir::Etc::sourcelist=$task_tmp/sources.list" -o "Dir::Etc::sourceparts=$task_tmp/empty"
+  -o Dir::Etc::main=/dev/null -o "Dir::Etc::parts=$task_tmp/empty"
   -o "Dir::Etc::preferences=/dev/null" -o "Dir::Etc::preferencesparts=$task_tmp/empty"
   -o "Dir::Etc::trusted=/dev/null" -o "Dir::Etc::trustedparts=$task_tmp/empty"
   -o "Dir::State::lists=$task_tmp/lists" -o "Dir::Cache::archives=$task_tmp/archives"

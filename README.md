@@ -35,19 +35,18 @@ source restricted to the `pascode` package. You do not need to clone this repo.
 ```bash
 (
   set -euo pipefail
-  pascode_keyring=$(mktemp)
-  trap 'rm -- "$pascode_keyring"' EXIT
+  pascode_tmp=$(mktemp -d)
+  trap 'rm -rf -- "$pascode_tmp"' EXIT
+  pascode_keyring="$pascode_tmp/keyring.gpg"
   curl -fsSL https://github.com/tarskisworld/pascode/releases/latest/download/pascode-archive-keyring.gpg -o "$pascode_keyring"
   printf '2b6da0a3d20700300afaa4532a78a9e479b074441f573f92bcb9faa147d6d676  %s\n' "$pascode_keyring" | sha256sum --check -
-  sudo install -d -m 0755 /etc/apt/keyrings
-  sudo install -m 0644 "$pascode_keyring" /etc/apt/keyrings/pascode.gpg
   printf '%s\n' \
     'Types: deb' \
     'URIs: https://github.com/tarskisworld/pascode/releases/latest/download/' \
     'Suites: ./' \
     'Architectures: amd64' \
     'Signed-By: /etc/apt/keyrings/pascode.gpg' \
-    | sudo tee /etc/apt/sources.list.d/pascode.sources >/dev/null
+    > "$pascode_tmp/pascode.sources"
   printf '%s\n' \
     'Package: pascode' \
     'Pin: release o=pascode' \
@@ -56,7 +55,22 @@ source restricted to the `pascode` package. You do not need to clone this repo.
     'Package: *' \
     'Pin: release o=pascode' \
     'Pin-Priority: -1' \
-    | sudo tee /etc/apt/preferences.d/pascode >/dev/null
+    > "$pascode_tmp/pascode.pref"
+  for pascode_pair in \
+    "$pascode_keyring:/etc/apt/keyrings/pascode.gpg" \
+    "$pascode_tmp/pascode.sources:/etc/apt/sources.list.d/pascode.sources" \
+    "$pascode_tmp/pascode.pref:/etc/apt/preferences.d/pascode"; do
+    pascode_source=${pascode_pair%%:*}
+    pascode_target=${pascode_pair#*:}
+    if sudo test -e "$pascode_target" && ! sudo cmp -s "$pascode_source" "$pascode_target"; then
+      printf 'Existing APT file differs: %s\n' "$pascode_target" >&2
+      exit 2
+    fi
+  done
+  sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d
+  sudo install -m 0644 "$pascode_keyring" /etc/apt/keyrings/pascode.gpg
+  sudo install -m 0644 "$pascode_tmp/pascode.sources" /etc/apt/sources.list.d/pascode.sources
+  sudo install -m 0644 "$pascode_tmp/pascode.pref" /etc/apt/preferences.d/pascode
   sudo apt update
   sudo apt install pascode
   /usr/bin/pascodectl setup
@@ -68,6 +82,8 @@ The `sudo` steps configure APT and install the package. Run `setup` as your
 ordinary user. Later upgrades use normal APT commands; run `pascodectl setup`
 after an upgrade to adopt its engine for your user. See the [APT repository
 notes](docs/apt-repository.md) for key management, rollback and removal.
+Re-running the block preserves identical APT files and refuses to overwrite
+differing administrator-managed files.
 
 ### Linux or macOS: native preview
 
