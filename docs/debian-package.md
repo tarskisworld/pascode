@@ -40,13 +40,14 @@ runtime and host launchers without adding another PATH shim.
 For the migration, setup backs up and retires only the exact user PATH launcher
 created by the previous installer. Custom launchers and symlinks are preserved;
 their owner must choose whether to retire them. The backup lives under
-`~/.pascode/migrations/package-setup/`. Existing compatibility package links and
+`${PASCODE_HOME:-$HOME/.pascode}/migrations/package-setup/`. Existing compatibility package links and
 ControlPlane's runtime forwarder remain valid. Run setup again after upgrading
 the Debian package to deliberately adopt its engine and refresh user launchers.
 
 Removing the package removes its system files, not home configuration, project
-state or Docker images. To return to the user installation, restore the backed-up
-PATH launcher; its installed files remain under `~/.pascode`. No destructive purge
+state or Docker images. To return to the user installation, rerun `bin/install-local`
+from a reviewed source checkout with the desired immutable engine image. Restoring
+the PATH launcher alone does not restore the previous user runtime. No destructive purge
 hook or automatic Docker image cleanup is supplied.
 
 ## Standard CLI feature map

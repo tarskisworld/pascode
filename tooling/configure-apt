@@ -6,9 +6,10 @@ task_public="$task_root/packaging/apt"
 [[ $(id -u) == 0 ]] || { echo 'Run with sudo in your terminal' >&2; exit 2; }
 task_tmp=$(mktemp -d)
 trap 'rm -rf -- "$task_tmp"' EXIT
+command -v gpg >/dev/null || { echo 'Install gnupg before configuring the APT feed' >&2; exit 2; }
 task_expected=$(cat "$task_public/pascode-archive-keyring.fingerprint")
-task_observed=$(gpg --homedir "$task_tmp" --batch --with-colons --show-keys "$task_public/pascode-archive-keyring.gpg" | awk -F: '$1=="fpr" {print $10;exit}')
-[[ "$task_expected" =~ ^[A-F0-9]{40}$ && "$task_observed" == "$task_expected" ]] || { echo 'Public key fingerprint mismatch' >&2; exit 2; }
+task_observed=$(gpg --homedir "$task_tmp" --batch --with-colons --show-keys "$task_public/pascode-archive-keyring.gpg" | awk -F: '$1=="pub" {primary=1;next} $1=="fpr" && primary {print $10;primary=0}')
+[[ "$task_expected" =~ ^[A-F0-9]{40}$ && "$task_observed" == "$task_expected" ]] || { echo 'Public keyring must contain exactly the reviewed primary key' >&2; exit 2; }
 task_arch=$(dpkg --print-architecture)
 [[ "$task_arch" == amd64 ]] || { echo 'This initial feed currently publishes amd64 only' >&2; exit 2; }
 cat > "$task_tmp/pascode.sources" <<'EOF'

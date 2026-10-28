@@ -3,6 +3,7 @@ set -euo pipefail
 task_source=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 task_image=${1:?Supply an existing immutable engine image}
 task_fixture=${2:?Supply the supported MainSystem declaration fixture}
+task_fixture=$(realpath -- "$task_fixture")
 task_tmp=$(mktemp -d)
 trap 'rm -rf -- "$task_tmp"' EXIT
 bash "$task_source/bin/install-local" "$task_image" "$task_tmp/runtime" "$task_tmp/path"

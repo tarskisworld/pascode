@@ -16,19 +16,18 @@ The parentheses keep shell settings and temporary variables out of your shell.
 ```bash
 (
   set -euo pipefail
-  pascode_keyring=$(mktemp)
-  trap 'rm -- "$pascode_keyring"' EXIT
+  pascode_tmp=$(mktemp -d)
+  trap 'rm -rf -- "$pascode_tmp"' EXIT
+  pascode_keyring="$pascode_tmp/keyring.gpg"
   curl -fsSL https://github.com/tarskisworld/pascode/releases/latest/download/pascode-archive-keyring.gpg -o "$pascode_keyring"
   printf '2b6da0a3d20700300afaa4532a78a9e479b074441f573f92bcb9faa147d6d676  %s\n' "$pascode_keyring" | sha256sum --check -
-  sudo install -d -m 0755 /etc/apt/keyrings
-  sudo install -m 0644 "$pascode_keyring" /etc/apt/keyrings/pascode.gpg
   printf '%s\n' \
     'Types: deb' \
     'URIs: https://github.com/tarskisworld/pascode/releases/latest/download/' \
     'Suites: ./' \
     'Architectures: amd64' \
     'Signed-By: /etc/apt/keyrings/pascode.gpg' \
-    | sudo tee /etc/apt/sources.list.d/pascode.sources >/dev/null
+    > "$pascode_tmp/pascode.sources"
   printf '%s\n' \
     'Package: pascode' \
     'Pin: release o=pascode' \
@@ -37,7 +36,22 @@ The parentheses keep shell settings and temporary variables out of your shell.
     'Package: *' \
     'Pin: release o=pascode' \
     'Pin-Priority: -1' \
-    | sudo tee /etc/apt/preferences.d/pascode >/dev/null
+    > "$pascode_tmp/pascode.pref"
+  for pascode_pair in \
+    "$pascode_keyring:/etc/apt/keyrings/pascode.gpg" \
+    "$pascode_tmp/pascode.sources:/etc/apt/sources.list.d/pascode.sources" \
+    "$pascode_tmp/pascode.pref:/etc/apt/preferences.d/pascode"; do
+    pascode_source=${pascode_pair%%:*}
+    pascode_target=${pascode_pair#*:}
+    if sudo test -e "$pascode_target" && ! sudo cmp -s "$pascode_source" "$pascode_target"; then
+      printf 'Existing APT file differs: %s\n' "$pascode_target" >&2
+      exit 2
+    fi
+  done
+  sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d
+  sudo install -m 0644 "$pascode_keyring" /etc/apt/keyrings/pascode.gpg
+  sudo install -m 0644 "$pascode_tmp/pascode.sources" /etc/apt/sources.list.d/pascode.sources
+  sudo install -m 0644 "$pascode_tmp/pascode.pref" /etc/apt/preferences.d/pascode
   sudo apt update
   sudo apt install pascode
   /usr/bin/pascodectl setup
@@ -49,9 +63,9 @@ hash -r
 ```
 
 Use sudo only for system installation and APT configuration; run setup as your
-ordinary user. Re-running the block refreshes only the pascode-owned key/source/
-preference files and package setup. For a checkout-based helper that refuses
-differing existing APT files, see [APT setup](docs/apt-repository.md).
+ordinary user. Re-running the block preserves identical APT files and refuses
+to overwrite differing ones. See [APT setup](docs/apt-repository.md) for key
+governance and recovery.
 
 ## Upgrade
 
@@ -59,7 +73,7 @@ differing existing APT files, see [APT setup](docs/apt-repository.md).
 sudo apt update
 sudo apt install --only-upgrade pascode
 /usr/bin/pascodectl setup
-pascodectl doctor
+/usr/bin/pascodectl doctor
 ```
 
 Normal `sudo apt upgrade` also upgrades the package. Setup deliberately adopts the
@@ -106,8 +120,9 @@ The shared user installation now lives in `~/.pascode`, independently of the
 ControlPlane source checkout. See [local installation](docs/local-installation.md)
 for installation, layout, compatibility paths and recovery boundaries.
 
-The CLI is versioned from `VERSION` using semantic versioning. `pascodectl version`
-and `pascodectl --help` work without starting Docker. An offline Debian package
+The CLI is versioned from `VERSION` using semantic versioning. The installed or
+packaged `pascodectl version` and `pascodectl --help` work without starting Docker.
+An offline Debian package
 provides the standard `/usr/bin/pascodectl` installation; see the
 [package and CLI contract](docs/debian-package.md) for setup, feature coverage,
 upgrades and the previous-launcher handoff.

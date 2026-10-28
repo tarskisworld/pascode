@@ -17,8 +17,8 @@ custom-launcher preservation, real archive load and simulated missing-image setu
 The same immutable engine previously passed all 81 existing suites plus the
 ControlPlane Compose worker/MCP checks and real stdio protocol probe.
 
-The Debian artifact is local under ignored `build/`, with a SHA-256 checksum.
-It has not been published. The user installed it with APT and ran explicit setup
+The initial Debian artifact was built locally under ignored `build/`, with a SHA-256 checksum,
+before the later public release. The user installed it with APT and ran explicit setup
 on 2026-10-20. Independently verified: dpkg reports `install ok installed 0.1.0`,
 PATH resolves `/usr/bin/pascodectl`, version reports `0.1.0`, and doctor is ready.
 Setup backed up and retired the previous managed PATH launcher. APT's `_apt`

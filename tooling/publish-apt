@@ -9,15 +9,19 @@ task_tag="v$task_version"
 [[ "$task_commit" =~ ^[a-f0-9]{40}$ ]] || { echo 'Use the full reviewed source commit' >&2; exit 2; }
 task_repo=tarskisworld/pascode
 gh api "repos/$task_repo/commits/$task_commit" --jq .sha >/dev/null
-if gh release view "$task_tag" --repo "$task_repo" >/dev/null 2>&1; then
-  echo 'Release already exists; never replace published package bytes' >&2; exit 2
+[[ -z $(git -C "$task_root" status --porcelain) && $(git -C "$task_root" rev-parse HEAD) == "$task_commit" ]] || { echo 'Publish only from a clean checkout at the reviewed commit' >&2; exit 2; }
+task_tmp=$(mktemp -d)
+trap 'rm -rf -- "$task_tmp"' EXIT
+task_existing=$(gh release list --repo "$task_repo" --limit 1000 --json tagName,isDraft --jq ".[]|select(.tagName==\"$task_tag\")|.isDraft")
+if [[ "$task_existing" == false ]]; then
+  echo 'Release already published; never replace published package bytes' >&2; exit 2
 fi
 cmp "$task_root/packaging/apt/pascode-archive-keyring.gpg" "$task_feed/pascode-archive-keyring.gpg"
 gpgv --keyring "$task_root/packaging/apt/pascode-archive-keyring.gpg" "$task_feed/InRelease"
 [[ -f "$task_feed/pascode_${task_version}_amd64.deb" ]] || { echo 'Current version package is missing' >&2; exit 2; }
-task_tmp=$(mktemp -d)
-trap 'rm -rf -- "$task_tmp"' EXIT
-if task_previous=$(gh release view --repo "$task_repo" --json tagName --jq .tagName 2>/dev/null); then
+[[ $(dpkg-deb --field "$task_feed/pascode_${task_version}_amd64.deb" Package) == pascode && $(dpkg-deb --field "$task_feed/pascode_${task_version}_amd64.deb" Version) == "$task_version" && $(dpkg-deb --field "$task_feed/pascode_${task_version}_amd64.deb" Architecture) == amd64 && $(dpkg-deb --field "$task_feed/pascode_${task_version}_amd64.deb" X-Source-Commit) == "$task_commit" ]] || { echo 'Current package metadata does not match this release' >&2; exit 2; }
+task_previous=$(gh release list --repo "$task_repo" --limit 1000 --json tagName,isLatest --jq '.[]|select(.isLatest)|.tagName')
+if [[ -n "$task_previous" ]]; then
   gh release view "$task_previous" --repo "$task_repo" --json assets --jq '.assets[].name' > "$task_tmp/assets"
   while IFS= read -r task_name; do
     [[ "$task_name" == *.deb ]] || continue
@@ -39,6 +43,21 @@ task_assets=("$task_feed"/*.deb "$task_feed/Packages" "$task_feed/Packages.gz"
   "$task_feed/Release" "$task_feed/InRelease" "$task_feed/Release.gpg"
   "$task_feed/pascode-archive-keyring.gpg" "$task_feed/pascode-archive-keyring.fingerprint"
   "$task_feed/pascode.sources")
-gh release create "$task_tag" "${task_assets[@]}" --repo "$task_repo" --draft \
-  --target "$task_commit" --title "P as code $task_version" --notes-file "$task_tmp/notes"
+if [[ "$task_existing" == true ]]; then
+  task_target=$(gh api "repos/$task_repo/releases/tags/$task_tag" --jq .target_commitish)
+  [[ "$task_target" == "$task_commit" ]] || { echo 'Draft release points at another source commit' >&2; exit 2; }
+  gh release view "$task_tag" --repo "$task_repo" --json assets --jq '.assets[].name' > "$task_tmp/draft-assets"
+  for task_asset in "${task_assets[@]}"; do
+    task_name=$(basename -- "$task_asset")
+    if rg -Fxq "$task_name" "$task_tmp/draft-assets"; then
+      gh release download "$task_tag" --repo "$task_repo" --pattern "$task_name" --dir "$task_tmp"
+      cmp "$task_tmp/$task_name" "$task_asset"
+    else
+      gh release upload "$task_tag" "$task_asset" --repo "$task_repo"
+    fi
+  done
+else
+  gh release create "$task_tag" "${task_assets[@]}" --repo "$task_repo" --draft \
+    --target "$task_commit" --title "P as code $task_version" --notes-file "$task_tmp/notes"
+fi
 gh release edit "$task_tag" --repo "$task_repo" --draft=false --latest

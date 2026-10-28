@@ -54,8 +54,9 @@ pull-request job. No GitHub Actions signing secret or unattended publisher is
 configured by this initial setup.
 The generated revocation certificate is separately encrypted at
 `pascode/apt/revocation-certificate`. Recovery of all three entries was verified
-without displaying their contents. Use full multiline output when recovering
-the private key or certificate; gopass password-only output returns only one line.
+without displaying their contents. Use `gopass cat` with output redirected to a
+private temporary file for each multiline key or certificate. Never print either
+to a terminal; password-only output returns only one line.
 
 For each new version: build/test its package, download prior .deb assets from the
 current stable release into a private staging directory, add the new package,
@@ -70,8 +71,8 @@ before publication. It verifies signatures, APT index parsing and package bytes,
 and requires APT to reject a tampered index, without changing system APT settings.
 
 The key expires after two years. Review rotation in advance and distribute a new
-public key through a separately trusted channel. Release metadata intentionally
-has no Valid-Until field, so an infrequently released CLI does not disable its
-feed automatically; this also means signatures alone do not prevent an old signed
-index being replayed. Normal APT version rules prevent silent downgrades. There
-is no automatic key rotation, scheduled metadata refresh, or automatic release.
+public key through a separately trusted channel. New signed metadata expires one
+year after creation, limiting how long a replayed old index remains valid. Publish
+fresh signed metadata before that date, even if the CLI package has not changed;
+use a new release rather than replacing bytes on an existing release. There is no
+automatic key rotation, scheduled metadata refresh, or automatic release.
