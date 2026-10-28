@@ -8,8 +8,9 @@ try {
   New-Item -ItemType Directory -Path $work | Out-Null
   $env:PASCODE_HOME = Join-Path $work 'home with spaces'
   $bin = Join-Path $work 'bin with spaces'
-  & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -NoPathUpdate -SkipSetup
-  & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -NoPathUpdate -SkipSetup
+  $manifestHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Assets 'SHA256SUMS')).Hash
+  & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup
+  & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup
   $command = Join-Path $bin 'pascodectl.exe'
   if ((Get-Content -Raw -LiteralPath (Join-Path $bin '.pascode-home')).Trim() -ne [IO.Path]::GetFullPath($env:PASCODE_HOME)) { throw 'Installed command lost its custom configuration root' }
   & $command version
@@ -24,7 +25,7 @@ try {
   $version = (Get-Content -Raw -LiteralPath (Join-Path $sourceRoot 'NATIVE_VERSION')).Trim()
   'corrupt' | Set-Content -LiteralPath (Join-Path $corrupt "pascodectl_${version}_windows_${arch}.zip")
   $rejected = $false
-  try { & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $corrupt -NoPathUpdate -SkipSetup }
+  try { & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $corrupt -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup }
   catch { if ($_.Exception.Message -match 'integrity check failed') { $rejected = $true } else { throw } }
   if (-not $rejected) { throw 'Installer accepted corrupt bytes' }
   Write-Host 'PASS native PowerShell installer, repeat install, spaced paths and checksum rejection'

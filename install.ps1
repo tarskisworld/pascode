@@ -3,12 +3,14 @@ param(
   [string]$InstallRoot = '',
   [string]$BinDir = '',
   [string]$DownloadDirectory = '',
+  [string]$ExpectedManifestSha256 = 'e4c5a12dceb1709cf9c86ebd0712f5a4de4c86ffcb9108139a255f21229282b3',
   [switch]$NoPathUpdate,
   [switch]$SkipSetup
 )
 $ErrorActionPreference = 'Stop'
 if ($env:OS -ne 'Windows_NT') { throw 'Use install.sh on Linux or macOS' }
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version' }
+if ($Version -ne '0.2.0-rc.2') { throw 'This installer is pinned to preview 0.2.0-rc.2' }
 $architecture = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
 switch ($architecture) { 'x64' { $arch = 'amd64' } 'arm64' { $arch = 'arm64' } default { throw 'Unsupported CPU architecture' } }
 if (-not $InstallRoot) { if ($env:PASCODE_HOME) { $InstallRoot = $env:PASCODE_HOME } else { $InstallRoot = Join-Path $env:USERPROFILE '.pascode' } }
@@ -35,7 +37,9 @@ try {
   }
   $archive = "pascodectl_${Version}_windows_${arch}.zip"
   $engine = "engine_linux_${arch}.tar.gz"
-  Fetch 'SHA256SUMS'; Fetch $archive; Verify $archive; Fetch $engine; Verify $engine
+  Fetch 'SHA256SUMS'
+  if ((Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $stage 'SHA256SUMS')).Hash -ine $ExpectedManifestSha256) { throw 'Release manifest checksum mismatch' }
+  Fetch $archive; Verify $archive; Fetch $engine; Verify $engine
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $zip = [IO.Compression.ZipFile]::OpenRead((Join-Path $stage $archive))
   try { foreach ($entry in $zip.Entries) { if ($entry.FullName -notin @('pascodectl.exe','engine.json','README.md')) { throw 'Unexpected archive member' } } } finally { $zip.Dispose() }

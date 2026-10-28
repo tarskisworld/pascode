@@ -3,6 +3,7 @@
 set -eu
 version=${PASCODE_VERSION:-0.2.0-rc.2}
 printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' || { echo 'Invalid release version' >&2; exit 2; }
+[ "$version" = 0.2.0-rc.2 ] || { echo 'This installer is pinned to preview 0.2.0-rc.2' >&2; exit 2; }
 case "$(uname -s)" in Linux) system=linux ;; Darwin) system=darwin ;; *) echo 'Use install.ps1 on Windows; this installer supports Linux and macOS' >&2; exit 2 ;; esac
 case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *) echo 'Unsupported CPU architecture' >&2; exit 2 ;; esac
 root=${PASCODE_HOME:-$HOME/.pascode}
@@ -32,6 +33,7 @@ verify() {
 archive="pascodectl_${version}_${system}_${arch}.tar.gz"
 engine="engine_linux_${arch}.tar.gz"
 fetch SHA256SUMS
+[ "$(hash_file "$stage/SHA256SUMS")" = "${PASCODE_EXPECTED_MANIFEST_SHA256:-e4c5a12dceb1709cf9c86ebd0712f5a4de4c86ffcb9108139a255f21229282b3}" ] || { echo 'Release manifest checksum mismatch' >&2; exit 1; }
 fetch "$archive"
 verify "$archive"
 fetch "$engine"

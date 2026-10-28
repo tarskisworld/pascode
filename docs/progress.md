@@ -110,5 +110,7 @@ upgrade handoff, archive loading, source-commit metadata, and overwrite refusal;
 the CLI and isolated APT tests passed. The portable branch now verifies the
 published preview installer and checksum manifest before execution in the public
 README. Local native tests cover cancellation before the Docker CID file exists;
-the pending CI run must validate Windows ACL behavior and both installers.
+the installer source now pins the published manifest hash and the test harness
+passes the hash of its newly built fixture assets explicitly. The pending CI run
+must validate Windows ACL behavior and both installers.
 No pull request has been merged and no new release has been published.

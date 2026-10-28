@@ -8,6 +8,7 @@ trap 'rm -r -- "$work"' EXIT HUP INT TERM
 export PASCODE_HOME="$work/home with spaces"
 export PASCODE_BIN_DIR="$work/bin with spaces"
 export PASCODE_DOWNLOAD_DIR="$assets"
+export PASCODE_EXPECTED_MANIFEST_SHA256=$(sha256sum "$assets/SHA256SUMS" | awk '{print $1}')
 export PASCODE_SKIP_SETUP=1
 mkdir -p "$PASCODE_BIN_DIR"
 printf '#!/bin/sh\necho custom\n' > "$PASCODE_BIN_DIR/pascodectl"
