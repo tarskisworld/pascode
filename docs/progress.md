@@ -115,3 +115,8 @@ passes the hash of its newly built fixture assets explicitly. The pending CI run
 must validate Windows ACL behavior and both installers.
 The installation pull request was merged into `main` on 2026-10-28. The portable
 pull request remains open against `main`, and no new release has been published.
+Further review removed the native host-Terraform override so deployment stays in
+the isolated engine, added an ownership-aware cancellation test, a negative
+manifest-integrity test, and package-time archive ID/platform validation. The
+published preview remains unchanged; these source changes still require a fresh
+passing platform matrix before integration.

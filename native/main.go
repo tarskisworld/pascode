@@ -51,6 +51,9 @@ func parse(args []string) (o options, err error) {
 		}
 		if strings.HasPrefix(s, "--") && strings.Contains(s, "=") {
 			p := strings.SplitN(s, "=", 2)
+			if p[0] == "--json" || p[0] == "--help" || p[0] == "--version" {
+				return o, usage("flag does not take a value")
+			}
 			args = append(append(append([]string{}, args[:i]...), p...), args[i+1:]...)
 			s = p[0]
 		}

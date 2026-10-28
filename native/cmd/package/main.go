@@ -64,6 +64,67 @@ func copyFile(source, target string) error {
 	}
 	return closeErr
 }
+func checkEngineArchive(path, image, arch string) error {
+	f, e := os.Open(path)
+	if e != nil {
+		return e
+	}
+	defer f.Close()
+	g, e := gzip.NewReader(f)
+	if e != nil {
+		return e
+	}
+	defer g.Close()
+	reader := tar.NewReader(g)
+	var manifestBytes []byte
+	configs := map[string][]byte{}
+	imageHex := strings.TrimPrefix(image, "sha256:")
+	for {
+		header, nextErr := reader.Next()
+		if nextErr == io.EOF {
+			break
+		}
+		if nextErr != nil {
+			return nextErr
+		}
+		if header.Name != "manifest.json" && !strings.HasSuffix(header.Name, "/"+imageHex) && header.Name != imageHex+".json" {
+			continue
+		}
+		if header.Size > 4<<20 {
+			return fmt.Errorf("engine archive metadata is too large")
+		}
+		data, readErr := io.ReadAll(io.LimitReader(reader, 4<<20+1))
+		if readErr != nil {
+			return readErr
+		}
+		if header.Name == "manifest.json" {
+			manifestBytes = data
+		} else {
+			configs[header.Name] = data
+		}
+	}
+	var manifest []struct{ Config string }
+	if e = json.Unmarshal(manifestBytes, &manifest); e != nil || len(manifest) != 1 {
+		return fmt.Errorf("engine archive must contain exactly one image manifest")
+	}
+	configBytes, ok := configs[manifest[0].Config]
+	if !ok {
+		return fmt.Errorf("engine archive lacks its image configuration")
+	}
+	configSum := sha256.Sum256(configBytes)
+	actualImage := "sha256:" + hex.EncodeToString(configSum[:])
+	if actualImage != image {
+		return fmt.Errorf("engine archive image ID differs from requested image")
+	}
+	var config struct {
+		Architecture string
+		OS           string `json:"os"`
+	}
+	if e = json.Unmarshal(configBytes, &config); e != nil || config.Architecture != arch || config.OS != "linux" {
+		return fmt.Errorf("engine archive platform differs from requested platform")
+	}
+	return nil
+}
 func build() error {
 	image := flag.String("image", "", "immutable engine image")
 	arch := flag.String("arch", "amd64", "engine and launcher architecture")
@@ -87,6 +148,9 @@ func build() error {
 	engineName := "engine_linux_" + *arch + ".tar.gz"
 	engineTarget := filepath.Join(*output, engineName)
 	if e = copyFile(*engine, engineTarget); e != nil {
+		return e
+	}
+	if e = checkEngineArchive(engineTarget, *image, *arch); e != nil {
 		return e
 	}
 	engineHash, e := hash(engineTarget)

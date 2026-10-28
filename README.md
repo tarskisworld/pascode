@@ -136,7 +136,8 @@ try {
   foreach ($name in @("pascodectl_0.2.0-rc.2_windows_$pascodeArch.zip", "engine_linux_$pascodeArch.tar.gz")) {
     Invoke-WebRequest -UseBasicParsing -Uri "$pascodeBase/$name" -OutFile (Join-Path $pascodeStage $name)
   }
-  & (Join-Path $pascodeStage 'install.ps1') -DownloadDirectory $pascodeStage
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $pascodeStage 'install.ps1') -DownloadDirectory $pascodeStage
+  if ($LASTEXITCODE -ne 0) { throw 'Installer failed' }
 } finally { Remove-Item -LiteralPath $pascodeStage -Recurse -Force }
 & "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
 ```

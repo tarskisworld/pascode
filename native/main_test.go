@@ -50,6 +50,13 @@ func TestMain(m *testing.M) {
 			}
 		}
 		if len(args) > 0 && args[0] == "run" && os.Getenv("PASCODE_TEST_CANCEL") == "1" {
+			if ownerPath := os.Getenv("PASCODE_TEST_OWNER_LABEL"); ownerPath != "" {
+				for i, s := range args {
+					if s == "--label" && i+1 < len(args) {
+						_ = os.WriteFile(ownerPath, []byte(args[i+1]), 0600)
+					}
+				}
+			}
 			if os.Getenv("PASCODE_TEST_CANCEL_NO_CID") != "1" {
 				for i, s := range args {
 					if s == "--cidfile" && i+1 < len(args) {
@@ -60,7 +67,10 @@ func TestMain(m *testing.M) {
 			time.Sleep(30 * time.Second)
 		}
 		if len(args) > 0 && args[0] == "ps" && os.Getenv("PASCODE_TEST_CANCEL_NO_CID") == "1" {
-			os.Stdout.WriteString(strings.Repeat("a", 64) + "\n")
+			owner, _ := os.ReadFile(os.Getenv("PASCODE_TEST_OWNER_LABEL"))
+			if len(args) == 4 && args[2] == "--filter" && args[3] == "label="+string(owner) && len(owner) > 0 {
+				os.Stdout.WriteString(strings.Repeat("a", 64) + "\n")
+			}
 		}
 		os.Exit(0)
 	}
@@ -79,7 +89,7 @@ func TestParseAndMetadata(t *testing.T) {
 			t.Fatal("global version flag did not short-circuit apply")
 		}
 	}
-	for _, args := range [][]string{{"--bad"}, {"wat"}, {"validate", "--project"}, {"--project", "a", "--project", "b", "validate"}} {
+	for _, args := range [][]string{{"--bad"}, {"wat"}, {"validate", "--project"}, {"--project", "a", "--project", "b", "validate"}, {"--json=false"}, {"--help=yes"}, {"--version=0"}} {
 		if _, e := parse(args); e == nil {
 			t.Fatal(args)
 		}
@@ -242,6 +252,7 @@ func TestCancelledContainerBeforeCIDFileIsRemoved(t *testing.T) {
 	t.Setenv("PASCODE_TEST_CANCEL_NO_CID", "1")
 	log := filepath.Join(t.TempDir(), "args")
 	t.Setenv("PASCODE_TEST_LOG", log)
+	t.Setenv("PASCODE_TEST_OWNER_LABEL", filepath.Join(t.TempDir(), "owner"))
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var out bytes.Buffer
@@ -261,7 +272,7 @@ func TestCancelledContainerBeforeCIDFileIsRemoved(t *testing.T) {
 		t.Fatal("cancellation succeeded")
 	}
 	b, _ := os.ReadFile(log)
-	if !strings.Contains(string(b), `"rm","--force"`) {
+	if string(b) != `["rm","--force","`+strings.Repeat("a", 64)+`"]` {
 		t.Fatal("owned container was not removed after missing CID file", string(b))
 	}
 }

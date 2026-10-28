@@ -108,10 +108,10 @@ published version and then run setup and doctor. Do not roll back deployment sta
 without checking compatibility with the older engine. Withdrawn preview 1 is not
 a rollback target.
 
-On Unix the command is a managed link in `~/.local/bin`; on Windows it is the
-managed executable in `%USERPROFILE%\.pascode\bin`. The installers record the
-selected user configuration root beside the command so a later shell uses the
-same installation even when the installer used a custom location. To remove a preview, first
+On Unix the command is a managed link in `~/.local/bin` and its version directory
+records the selected user configuration root. On Windows the managed executable
+and configuration-root record live in `%USERPROFILE%\.pascode\bin` by default.
+This lets a later shell use a custom installation location. To remove a preview, first
 stop using the command, then remove only that managed command and the corresponding
 version directory. On Windows also remove the managed record, `engine.json` and
 `.pascode-home` beside the command. Leave `config.json`, credentials and per-project deployment

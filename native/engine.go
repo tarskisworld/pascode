@@ -380,9 +380,6 @@ func (a app) deployment(o options, project string) error {
 		return e
 	}
 	terraform := func(args ...string) error {
-		if binary := os.Getenv("PASCODE_TERRAFORM_BINARY"); binary != "" {
-			return a.run(binary, append([]string{"-chdir=" + filepath.Join(state, "terraform")}, args...), env)
-		}
 		d := a.base(false)
 		d = append(d, "--tmpfs", "/tmp:rw,nosuid,nodev", "--env", "HOME=/tmp", "--mount", mountArg(filepath.Join(state, "terraform"), "/work", false), "--workdir", "/work")
 		for _, key := range []string{"TF_IN_AUTOMATION", "TF_INPUT", "TF_VAR_jira_api_base_url", "TF_VAR_jira_admin_email", "TF_VAR_jira_admin_token"} {
