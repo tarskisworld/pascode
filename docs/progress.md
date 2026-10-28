@@ -111,12 +111,16 @@ the CLI and isolated APT tests passed. The portable branch now verifies the
 published preview installer and checksum manifest before execution in the public
 README. Local native tests cover cancellation before the Docker CID file exists;
 the installer source now pins the published manifest hash and the test harness
-passes the hash of its newly built fixture assets explicitly. The pending CI run
-must validate Windows ACL behavior and both installers.
-The installation pull request was merged into `main` on 2026-10-28. The portable
-pull request remains open against `main`, and no new release has been published.
+passes the hash of its newly built fixture assets explicitly. The final hosted
+run validated Windows ACL behavior and both installers.
+The installation and portable pull requests were merged into `main` on
+2026-10-28. No new release was published by these merges.
 Further review removed the native host-Terraform override so deployment stays in
 the isolated engine, added an ownership-aware cancellation test, a negative
 manifest-integrity test, and package-time archive ID/platform validation. The
-published preview remains unchanged; these source changes still require a fresh
-passing platform matrix before integration.
+published preview remains unchanged. The final source revision passed both engine
+builds and native Linux, macOS, and Windows checks on x86-64 and ARM64, plus the
+security and code review checks, before integration. The public README on `main`
+now documents clone-free installation and names Jira as the first adapter rather
+than the product boundary. Native Docker Desktop execution, code signing or
+notarization, and minimum platform versions remain open preview acceptance work.
