@@ -5,8 +5,8 @@ services. Jira is the first implemented adapter, not the product boundary.
 Installing the CLI does not confer support for a service without an adapter and
 declaration schema.
 
-The user requires installation by another person on another machine, rather than
-commands specialized for the development workstation. This document records the
+Users need to install the CLI on their own machines using commands that do not
+depend on the development workstation. This document records the
 implemented native preview and the remaining acceptance criteria. Version 0.1.0
 remains the published stable release; native preview 0.2.0-rc.2 is published as a
 prerelease.

@@ -32,18 +32,21 @@ func secureDirectory(path string) error {
 	// Set the complete DACL in one operation. icacls /grant:r would leave
 	// unrelated explicit grants from an existing workspace in place.
 	const script = `$path = $env:PASCODE_STATE_DIR
-$acl = Get-Acl -LiteralPath $path
-$acl.SetAccessRuleProtection($true, $false)
-foreach ($rule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($rule) }
-$inherit = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'
-$propagate = [System.Security.AccessControl.PropagationFlags]::None
-$allow = [System.Security.AccessControl.AccessControlType]::Allow
-$full = [System.Security.AccessControl.FileSystemRights]::FullControl
 $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
 $systemSid = [System.Security.Principal.SecurityIdentifier]'S-1-5-18'
-$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($userSid,$full,$inherit,$propagate,$allow))
-$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($systemSid,$full,$inherit,$propagate,$allow))
-Set-Acl -LiteralPath $path -AclObject $acl`
+$full = [System.Security.AccessControl.FileSystemRights]::FullControl
+$allow = [System.Security.AccessControl.AccessControlType]::Allow
+$items = @(Get-Item -LiteralPath $path) + @(Get-ChildItem -LiteralPath $path -Force -Recurse)
+foreach ($item in $items) {
+  if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'State workspace contains a link; refusing to secure it' }
+  $acl = Get-Acl -LiteralPath $item.FullName
+  $acl.SetAccessRuleProtection($true, $false)
+  foreach ($rule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($rule) }
+  $inherit = if ($item.PSIsContainer) { [System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit' } else { [System.Security.AccessControl.InheritanceFlags]::None }
+  $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($userSid,$full,$inherit,[System.Security.AccessControl.PropagationFlags]::None,$allow))
+  $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($systemSid,$full,$inherit,[System.Security.AccessControl.PropagationFlags]::None,$allow))
+  Set-Acl -LiteralPath $item.FullName -AclObject $acl
+}`
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
 	cmd.Env = append(os.Environ(), "PASCODE_STATE_DIR="+path)
 	if output, e := cmd.CombinedOutput(); e != nil {

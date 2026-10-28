@@ -108,8 +108,7 @@ differing administrator-managed files.
     curl -fsSL "$pascode_base/$pascode_file" -o "$pascode_stage/$pascode_file"
   done
   PASCODE_DOWNLOAD_DIR="$pascode_stage" sh "$pascode_stage/install.sh"
-)
-"$HOME/.local/bin/pascodectl" doctor
+) && "$HOME/.local/bin/pascodectl" doctor
 ```
 
 The fixed hashes above pin the installer and manifest for this preview; the
@@ -138,8 +137,8 @@ try {
   }
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $pascodeStage 'install.ps1') -DownloadDirectory $pascodeStage
   if ($LASTEXITCODE -ne 0) { throw 'Installer failed' }
+  & "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
 } finally { Remove-Item -LiteralPath $pascodeStage -Recurse -Force }
-& "$env:USERPROFILE\.pascode\bin\pascodectl.exe" doctor
 ```
 
 The installer adds its command directory to your user PATH for future terminals.

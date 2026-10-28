@@ -55,6 +55,12 @@ try {
   } else { New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null; Move-Item -LiteralPath $package -Destination $destination }
   $command = Join-Path $BinDir 'pascodectl.exe'
   $record = Join-Path $BinDir '.pascode-managed.json'
+  $binConfig = Join-Path $BinDir 'engine.json'
+  if (Test-Path -LiteralPath $binConfig) {
+    if (-not (Test-Path -LiteralPath $record)) { throw 'Custom engine configuration exists; choose another BinDir' }
+    $oldRecord = Get-Content -Raw -LiteralPath $record | ConvertFrom-Json
+    if (-not $oldRecord.engineSha256 -or (Get-FileHash -Algorithm SHA256 -LiteralPath $binConfig).Hash -ne $oldRecord.engineSha256) { throw 'Existing engine configuration is not installer-managed; refusing to overwrite it' }
+  }
   if (Test-Path -LiteralPath $command) {
     if (-not (Test-Path -LiteralPath $record)) { throw 'Custom command exists; choose another BinDir' }
     $previous = Get-Content -Raw -LiteralPath $record | ConvertFrom-Json
@@ -74,7 +80,8 @@ try {
   [IO.File]::WriteAllText((Join-Path $BinDir '.pascode-home'),($InstallRoot + [Environment]::NewLine),[Text.UTF8Encoding]::new($false))
   $config = Get-Content -Raw -LiteralPath (Join-Path $destination 'engine.json') | ConvertFrom-Json
   $config.archive = Join-Path $destination $engine
-  [IO.File]::WriteAllText((Join-Path $BinDir 'engine.json'),($config | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+  [IO.File]::WriteAllText($binConfig,($config | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+  @{sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $command).Hash;engineSha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $binConfig).Hash;version=$Version} | ConvertTo-Json | Set-Content -LiteralPath $record -Encoding UTF8
   if (-not $NoPathUpdate) {
     $userPath = [Environment]::GetEnvironmentVariable('Path','User')
     if ($null -eq $userPath) { $userPath = '' }

@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -183,7 +184,7 @@ func loadConfig(preferRelease bool) (config, error) {
 	if b, e := os.ReadFile(filepath.Join(home, "runtime.env")); e == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			if strings.HasPrefix(line, "PASCODE_IMAGE=") {
-				c = config{Schema: 1, Image: strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "PASCODE_IMAGE=")), "\"'"), Platform: "linux/amd64"}
+				c = config{Schema: 1, Image: strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "PASCODE_IMAGE=")), "\"'"), Platform: "linux/" + runtime.GOARCH}
 				return c, validateConfig(c)
 			}
 		}

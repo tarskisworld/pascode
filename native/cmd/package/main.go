@@ -145,6 +145,16 @@ func build() error {
 	if e = os.MkdirAll(*output, 0755); e != nil {
 		return e
 	}
+	for _, name := range []string{"engine_linux_" + *arch + ".tar.gz", "SHA256SUMS-" + *arch,
+		"pascodectl_" + version + "_linux_" + *arch + ".tar.gz",
+		"pascodectl_" + version + "_darwin_" + *arch + ".tar.gz",
+		"pascodectl_" + version + "_windows_" + *arch + ".zip"} {
+		if _, err := os.Stat(filepath.Join(*output, name)); err == nil {
+			return fmt.Errorf("release artifact already exists: %s", name)
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+	}
 	engineName := "engine_linux_" + *arch + ".tar.gz"
 	engineTarget := filepath.Join(*output, engineName)
 	if e = copyFile(*engine, engineTarget); e != nil {
