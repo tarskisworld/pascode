@@ -19,7 +19,8 @@ It still requires a running, accessible Docker daemon, Bash and GNU host utiliti
 The host launchers use `flock`, `realpath`, `sha256sum` and Unix user IDs. Therefore
 the stable launcher is not a native Windows or macOS distribution, and the
 container alone does not supply host portability. The separate 0.2.0-rc.2
-prerelease has Linux arm64 artifacts.
+prerelease provides native artifacts for Linux, macOS and Windows on x86-64
+and ARM64.
 
 ## Supported-platform target
 

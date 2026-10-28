@@ -9,6 +9,7 @@ trap 'rm -r -- "$work"' EXIT HUP INT TERM
 export PASCODE_HOME="$work/home"
 export PASCODE_BIN_DIR="$work/bin"
 export PASCODE_DOWNLOAD_DIR="$assets"
+export PASCODE_EXPECTED_MANIFEST_SHA256=$(sha256sum "$assets/SHA256SUMS" | awk '{print $1}')
 export PASCODE_SKIP_SETUP=1
 sh "$source_root/install.sh" > "$work/install.log"
 "$PASCODE_BIN_DIR/pascodectl" setup

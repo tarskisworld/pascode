@@ -18,6 +18,7 @@ import (
 )
 
 const testImage = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const testLoadedImage = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
 func TestMain(m *testing.M) {
 	if os.Getenv("PASCODE_FAKE_DOCKER") == "1" && len(os.Args) > 1 &&
@@ -34,6 +35,8 @@ func TestMain(m *testing.M) {
 			if len(args) > 1 && args[0] == "image" && args[1] == "inspect" {
 				if len(args) > 2 && args[2] == "--format" {
 					os.Stdout.WriteString("linux/amd64\n")
+				} else if len(args) > 2 && os.Getenv("PASCODE_TEST_SETUP_FALLBACK") == "1" && args[2] == testImage {
+					os.Exit(1)
 				} else if _, e := os.Stat(state); os.IsNotExist(e) {
 					os.Exit(1)
 				}
@@ -43,7 +46,7 @@ func TestMain(m *testing.M) {
 					os.Exit(2)
 				}
 				_ = os.WriteFile(state, []byte(args[2]), 0600)
-				os.Stdout.WriteString("Loaded image ID: " + testImage + "\n")
+				os.Stdout.WriteString("Loaded image ID: " + testLoadedImage + "\n")
 			}
 		}
 		if len(args) > 0 && args[0] == "run" && os.Getenv("PASCODE_TEST_CANCEL") == "1" {
@@ -279,6 +282,7 @@ func TestSetupLoadsVerifiedCopy(t *testing.T) {
 	state := filepath.Join(root, "load-state")
 	t.Setenv("PASCODE_FAKE_DOCKER", "1")
 	t.Setenv("PASCODE_TEST_SETUP_STATE", state)
+	t.Setenv("PASCODE_TEST_SETUP_FALLBACK", "1")
 	t.Setenv("PASCODE_HOME", filepath.Join(root, "home"))
 	var out bytes.Buffer
 	a := app{ctx: context.Background(), out: &out, err: &out, docker: os.Args[0], config: config{Schema: 1, Image: testImage, Platform: "linux/amd64", Archive: archive, SHA256: fmt.Sprintf("%x", sha256.Sum256(data))}}
@@ -291,6 +295,11 @@ func TestSetupLoadsVerifiedCopy(t *testing.T) {
 	}
 	if _, e := os.Stat(string(loadedPath)); !os.IsNotExist(e) {
 		t.Fatalf("verified staging file was retained: %v", e)
+	}
+	stored, e := os.ReadFile(filepath.Join(root, "home", "config.json"))
+	var saved config
+	if e != nil || json.Unmarshal(stored, &saved) != nil || saved.Image != testLoadedImage {
+		t.Fatalf("loaded image ID was not persisted: %v %s", e, stored)
 	}
 }
 func TestPrivateStateRejectsGit(t *testing.T) {
