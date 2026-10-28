@@ -45,7 +45,7 @@ No existing login credentials or deployment state changed.
 Selective ControlPlane integration remains separate; do not commit its unrelated
 changes. See [APT repository governance and setup](apt-repository.md).
 
-Source review: https://github.com/tarskisworld/pascode/pull/1 (not merged).
+Source review: https://github.com/tarskisworld/pascode/pull/1 (merged on 2026-10-28).
 
 The user's APT run also reported a separate GitHub CLI archive-key warning.
 It does not affect the P as code feed; the current official GitHub CLI keyring was
@@ -113,4 +113,5 @@ README. Local native tests cover cancellation before the Docker CID file exists;
 the installer source now pins the published manifest hash and the test harness
 passes the hash of its newly built fixture assets explicitly. The pending CI run
 must validate Windows ACL behavior and both installers.
-No pull request has been merged and no new release has been published.
+The installation pull request was merged into `main` on 2026-10-28. The portable
+pull request remains open against `main`, and no new release has been published.

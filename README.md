@@ -182,9 +182,9 @@ This repository contains the reusable CLI, engine, validation, mapping, bindings
 deployment and audit code. Project declarations and target-specific evidence live
 in independent repositories. The [package and CLI contract](docs/debian-package.md)
 explains the stable package; the [changelog](CHANGELOG.md) records stable releases.
-The [native launcher pull request](https://github.com/tarskisworld/pascode/pull/2)
+The [native launcher review](https://github.com/tarskisworld/pascode/pull/2)
 and [preview release](https://github.com/tarskisworld/pascode/releases/tag/v0.2.0-rc.2)
-show the current cross-platform work. No live Jira deployment is implied by
+record the cross-platform work. No live Jira deployment is implied by
 installing the CLI.
 
 Report problems or request features in the [ControlPlane issue tracker](https://github.com/cloisterdorateura/ControlPlane/issues),
