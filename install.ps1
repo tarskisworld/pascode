@@ -59,7 +59,18 @@ try {
   if (Test-Path -LiteralPath $binConfig) {
     if (-not (Test-Path -LiteralPath $record)) { throw 'Custom engine configuration exists; choose another BinDir' }
     $oldRecord = Get-Content -Raw -LiteralPath $record | ConvertFrom-Json
-    if (-not $oldRecord.engineSha256 -or (Get-FileHash -Algorithm SHA256 -LiteralPath $binConfig).Hash -ne $oldRecord.engineSha256) { throw 'Existing engine configuration is not installer-managed; refusing to overwrite it' }
+    if ($oldRecord.engineSha256) {
+      if ((Get-FileHash -Algorithm SHA256 -LiteralPath $binConfig).Hash -ne $oldRecord.engineSha256) { throw 'Existing engine configuration was modified; refusing to overwrite it' }
+    } else {
+      if ($oldRecord.version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw 'Unrecognized legacy installer record' }
+      $oldPlatform = Join-Path $InstallRoot "versions\$($oldRecord.version)\windows-$arch"
+      $oldPackageConfig = Join-Path $oldPlatform 'engine.json'
+      if (-not (Test-Path -LiteralPath $oldPackageConfig)) { throw 'Cannot verify legacy engine configuration' }
+      $expectedConfig = Get-Content -Raw -LiteralPath $oldPackageConfig | ConvertFrom-Json
+      $actualConfig = Get-Content -Raw -LiteralPath $binConfig | ConvertFrom-Json
+      $expectedArchive = Join-Path $oldPlatform "engine_linux_$arch.tar.gz"
+      if ($actualConfig.schema -ne $expectedConfig.schema -or $actualConfig.image -ne $expectedConfig.image -or $actualConfig.platform -ne $expectedConfig.platform -or $actualConfig.sha256 -ne $expectedConfig.sha256 -or $actualConfig.archive -ne $expectedArchive) { throw 'Existing engine configuration is not installer-managed; refusing to overwrite it' }
+    }
   }
   if (Test-Path -LiteralPath $command) {
     if (-not (Test-Path -LiteralPath $record)) { throw 'Custom command exists; choose another BinDir' }

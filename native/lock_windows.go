@@ -32,6 +32,7 @@ func secureDirectory(path string) error {
 	// Set the complete DACL in one operation. icacls /grant:r would leave
 	// unrelated explicit grants from an existing workspace in place.
 	const script = `$path = $env:PASCODE_STATE_DIR
+$ErrorActionPreference = 'Stop'
 $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
 $systemSid = [System.Security.Principal.SecurityIdentifier]'S-1-5-18'
 $full = [System.Security.AccessControl.FileSystemRights]::FullControl

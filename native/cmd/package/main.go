@@ -157,10 +157,15 @@ func build() error {
 	}
 	engineName := "engine_linux_" + *arch + ".tar.gz"
 	engineTarget := filepath.Join(*output, engineName)
+	if e = checkEngineArchive(*engine, *image, *arch); e != nil {
+		return e
+	}
 	if e = copyFile(*engine, engineTarget); e != nil {
+		os.Remove(engineTarget)
 		return e
 	}
 	if e = checkEngineArchive(engineTarget, *image, *arch); e != nil {
+		os.Remove(engineTarget)
 		return e
 	}
 	engineHash, e := hash(engineTarget)

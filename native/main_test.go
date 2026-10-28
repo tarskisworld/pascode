@@ -260,14 +260,20 @@ func TestCancelledContainerBeforeCIDFileIsRemoved(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- a.run(a.docker, []string{"run", "--rm", testImage}, nil) }()
 	deadline := time.Now().Add(5 * time.Second)
+	started := false
 	for time.Now().Before(deadline) {
-		b, _ := os.ReadFile(log)
-		if strings.Contains(string(b), `"run"`) {
+		b, _ := os.ReadFile(os.Getenv("PASCODE_TEST_OWNER_LABEL"))
+		if strings.HasPrefix(string(b), "pascode.owner=") {
+			started = true
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	cancel()
+	if !started {
+		<-done
+		t.Fatal("test child did not write its owner marker")
+	}
 	if e := <-done; e == nil {
 		t.Fatal("cancellation succeeded")
 	}

@@ -11,6 +11,12 @@ try {
   $manifestHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $Assets 'SHA256SUMS')).Hash
   & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup
   & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup
+  $recordPath = Join-Path $bin '.pascode-managed.json'
+  $legacyRecord = Get-Content -Raw -LiteralPath $recordPath | ConvertFrom-Json
+  $legacyRecord.PSObject.Properties.Remove('engineSha256')
+  $legacyRecord | ConvertTo-Json | Set-Content -LiteralPath $recordPath -Encoding UTF8
+  & (Join-Path $sourceRoot 'install.ps1') -InstallRoot $env:PASCODE_HOME -BinDir $bin -DownloadDirectory $Assets -ExpectedManifestSha256 $manifestHash -NoPathUpdate -SkipSetup
+  if (-not (Get-Content -Raw -LiteralPath $recordPath | ConvertFrom-Json).engineSha256) { throw 'Legacy managed configuration did not migrate' }
   $command = Join-Path $bin 'pascodectl.exe'
   if ((Get-Content -Raw -LiteralPath (Join-Path $bin '.pascode-home')).Trim() -ne [IO.Path]::GetFullPath($env:PASCODE_HOME)) { throw 'Installed command lost its custom configuration root' }
   & $command version

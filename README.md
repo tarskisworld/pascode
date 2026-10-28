@@ -108,7 +108,7 @@ differing administrator-managed files.
     curl -fsSL "$pascode_base/$pascode_file" -o "$pascode_stage/$pascode_file"
   done
   PASCODE_DOWNLOAD_DIR="$pascode_stage" sh "$pascode_stage/install.sh"
-) && "$HOME/.local/bin/pascodectl" doctor
+) && "${PASCODE_BIN_DIR:-$HOME/.local/bin}/pascodectl" doctor
 ```
 
 The fixed hashes above pin the installer and manifest for this preview; the
