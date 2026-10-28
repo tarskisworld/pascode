@@ -45,9 +45,78 @@ No existing login credentials or deployment state changed.
 Selective ControlPlane integration remains separate; do not commit its unrelated
 changes. See [APT repository governance and setup](apt-repository.md).
 
-Source review: https://github.com/tarskisworld/pascode/pull/1 (not merged).
+Source review: https://github.com/tarskisworld/pascode/pull/1 (merged on 2026-10-28).
 
 The user's APT run also reported a separate GitHub CLI archive-key warning.
 It does not affect the P as code feed; the current official GitHub CLI keyring was
 downloaded and its published SHA-256 and live signature verified for a separate
 user-run system keyring refresh.
+
+## Native distribution preview
+
+Branch: `codex/portable-cli`; review: https://github.com/tarskisworld/pascode/pull/2.
+Tracking: ControlPlane issues 11 (portable host launcher), 12 (native installers),
+and 13 (clean-runner validation). The native preview uses `NATIVE_VERSION`
+`0.2.0-rc.2`; the stable APT feed and `VERSION` remain at `0.1.0`.
+
+Implemented: standard-library Go host command with Windows and Unix state locks,
+Docker cancellation cleanup, selected credential forwarding, explicit setup and
+doctor; SHA-256 checked per-user Unix and PowerShell installers; Linux/macOS/Windows
+x86-64 and ARM64 asset builder; and six-platform GitHub Actions matrix. The local
+Linux native install completed real Docker setup, five-contract offline validation,
+mapping and bindings. Native Unix installer tests cover repeat install, paths with
+spaces and corrupt artifacts. Both engine architecture jobs passed on the first
+CI run, as did Linux and macOS native jobs. Windows repeat install found a missing
+backup path in file replacement; fixed on the branch. A new full matrix is running.
+
+All eight CI jobs passed for preview 1, including both Windows architectures and
+both PowerShell editions. Its public download and checksum verification succeeded,
+but a clean `setup` exposed a Docker import mismatch: the local daemon assigned a
+new image ID to the verified CI-built archive. Preview 1 was withdrawn. Preview 2
+records the actual local immutable ID after loading and checks the image platform.
+
+Preview 2 completed all eight CI jobs: two engine builds, four Unix native jobs
+and two Windows native jobs. Linux x86-64 and ARM64 runners both loaded their
+release engine archives and passed setup/doctor. The public prerelease at
+https://github.com/tarskisworld/pascode/releases/tag/v0.2.0-rc.2 has 13 assets.
+An isolated Linux amd64 download verified the installer checksum, installed the
+public assets, loaded the engine and passed doctor/version. GitHub still reports
+`v0.1.0` as latest, so the signed APT feed is unchanged. The README now gives
+clone-free installation commands. Preview 1 stays withdrawn. Remaining acceptance:
+Docker Desktop execution on native macOS/Windows, publisher signing/notarization,
+and tested minimum OS/runtime versions. Do not close the corresponding tasks yet.
+No live Jira apply was run.
+
+## Current follow-up — 2026-10-26
+
+The public README and portability guide now distinguish the project's intended
+scope (software with APIs) from its implemented Jira adapters. The portable CLI
+review is in progress: global version reporting, CRLF legacy pins, deployment
+state permissions and marker errors, selected host environment forwarding,
+configuration durability, and a read-only default development mount were
+revised locally. Native Go tests and vet pass. These edits are not yet part of
+the published prerelease; the remaining review findings, including installer
+bootstrap trust, Docker cancellation, Windows ACL handling and native Docker
+Desktop validation, remain open before a further preview or task closure.
+Engine setup now loads a private copy of the checked archive and checks the
+platform of a preexisting image; a focused native test verifies staging and
+cleanup. Native Go tests and vet pass after that follow-up.
+
+## Merge preparation — 2026-10-28
+
+The installation review fixes were committed on `codex/home-installation` and
+merged into the portable branch. A rebuilt Debian package passed package setup,
+upgrade handoff, archive loading, source-commit metadata, and overwrite refusal;
+the CLI and isolated APT tests passed. The portable branch now verifies the
+published preview installer and checksum manifest before execution in the public
+README. Local native tests cover cancellation before the Docker CID file exists;
+the installer source now pins the published manifest hash and the test harness
+passes the hash of its newly built fixture assets explicitly. The pending CI run
+must validate Windows ACL behavior and both installers.
+The installation pull request was merged into `main` on 2026-10-28. The portable
+pull request remains open against `main`, and no new release has been published.
+Further review removed the native host-Terraform override so deployment stays in
+the isolated engine, added an ownership-aware cancellation test, a negative
+manifest-integrity test, and package-time archive ID/platform validation. The
+published preview remains unchanged; these source changes still require a fresh
+passing platform matrix before integration.
