@@ -26,7 +26,7 @@ rm -- "$PASCODE_BIN_DIR/pascodectl"
 sh "$source_root/install.sh"
 sh "$source_root/install.sh"
 "$PASCODE_BIN_DIR/pascodectl" version
-test "$(cat "$(dirname "$(readlink "$PASCODE_BIN_DIR/pascodectl")")/.pascode-home")" = "$PASCODE_HOME"
+test "$(cat "$(dirname "$(readlink "$PASCODE_BIN_DIR/pascodectl")")/.pascode-home")" = "$(cd "$PASCODE_HOME" && pwd -P)"
 "$PASCODE_BIN_DIR/pascodectl" --help > "$work/help"
 grep -q 'No host Bash' "$work/help"
 mkdir "$work/corrupt"
